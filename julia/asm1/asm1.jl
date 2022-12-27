@@ -92,3 +92,25 @@ function get_default_parameters_asm1(; get_R::Bool=true)
      return (p, X_init)
 
 end
+
+function get_stoichiometric_matrix(stoichiometric_parameters)
+
+     Y_A = stoichiometric_parameters[1] ; Y_H = stoichiometric_parameters[2] ; f_P = stoichiometric_parameters[3] ; i_XB = stoichiometric_parameters[4] ; i_XP = stoichiometric_parameters[5]
+     
+     R = [           0      0     0     0     0     0     0     0;
+          -1/Y_H -1/Y_H     0     0     0     0     1     0;
+               0      0     0     0     0     0     0     0;
+               0      0     0 1-f_P 1-f_P     0    -1     0;
+               1      1     0    -1     0     0     0     0;
+               0      0     1     0    -1     0     0     0;
+               0      0     0   f_P   f_P     0     0     0;
+          -(1-Y_H)/Y_H      0 -4.57/Y_A+1 0   0     0     0     0;
+                    0 -(1-Y_H)/(2.86*Y_H) 1.0/Y_A 0 0 0  0     0;
+               -i_XB -i_XB -(i_XB+(1.0/Y_A)) 0 0  1     0     0;
+                    0      0     0     0     0    -1     0     1;
+                    0      0     0 (i_XB-f_P*i_XP) (i_XB-f_P*i_XP) 0 0 -1;
+          -i_XB/14 (1-Y_H)/(14*2.86*Y_H)-(i_XB/14) -(i_XB/14)+1/(7*Y_A) 0 0 1/14 0 0]
+
+     return R
+
+end
