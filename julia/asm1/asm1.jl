@@ -45,13 +45,18 @@ end
 """
 Return the default parameters for ASM1 model.
 """
-function get_default_parameters_asm1(; get_R::Bool=true)
+function get_default_parameters_asm1(; T = 15, get_R::Bool=true)
+
+     ### Define the function that adapts the parameters according to the temperature ###
+     function T_var(T, ρ, a)
+          return ρ * exp((log2(ρ/a)/5)*(T-15))
+     end  
 
      ### Set vector with default parameters ###
      p = []
 
      ### Kinetic parameters ###
-     μ_H = 4.0 ; K_S = 10.0 ; K_OH = 0.2 ; K_NO = 0.5 ; b_H = 0.3 ; η_g = 0.8 ; η_h = 0.8 ; k_h = 3.0 ; K_X = 0.1 ; μ_A = 0.5 ; K_NH = 1.0 ; b_A = 0.05 ; K_OA =  0.4 ; k_a = 0.05
+     μ_H = T_var(T, 4.0, 3) ; K_S = 10.0 ; K_OH = 0.2 ; K_NO = 0.5 ; b_H = T_var(T, 0.3, 0.2) ; η_g = 0.8 ; η_h = 0.8 ; k_h = T_var(T, 3.0, 2.5) ; K_X = 0.1 ; μ_A = T_var(T, 0.5, 0.3) ; K_NH = 1.0 ; b_A = T_var(T, 0.05, 0.03) ; K_OA =  0.4 ; k_a = T_var(T, 0.05, 0.04)
      kinetic_parameters = [μ_H, K_S, K_OH, K_NO, b_H, η_g, η_h, k_h, K_X, μ_A, K_NH, b_A, K_OA, k_a]
      push!(p, kinetic_parameters)
 
@@ -83,8 +88,8 @@ function get_default_parameters_asm1(; get_R::Bool=true)
      push!(p, 18061.0) # Q_in
 
      ### Control parameters : Redox control ###
-     push!(p, 8) # SO_sat
-     push!(p, 200) # KLa
+     push!(p, (8/10.50237016)*6791.5*(56.12*exp(-66.7354 + 87.4755/((T+273.15)/100.0) + 24.4526*log((T+273.15)/100.0)))) # SO_sat
+     push!(p, 200*(1.024^(T-15))) # KLa
 
      ### X_init ###
      X_init =  [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699, 964.8992, 0.0093, 3.9350, 6.8924, 0.9580, 3.8453, 5.4213, 0.0]
