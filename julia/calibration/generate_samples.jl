@@ -4,8 +4,8 @@ include("../asm1/asm1.jl")
 include("../asm1/control.jl")
 
 ### Parameters scripts ###
-nb_samples = 10
-size_samples = 2000
+nb_samples = 10_000
+size_samples = Int((24*60))
 
 ### Define the model ###
 # Get default parameters
@@ -13,8 +13,8 @@ p, X_init = get_default_parameters_asm1()
 p_vec, ~ = get_default_parameters_asm1(get_R=false)
 
 # Define the ODE problem
-tspan = (0, 20)
-tsave = collect(range(10, stop=20, length=size_samples))
+tspan = (0, 10)
+tsave = collect(range(9, stop=10, length=size_samples))
 prob = ODEProblem(asm1!, X_init, tspan, p)
 
 ### Simulate multiple times the ODE ###
@@ -38,8 +38,14 @@ p_grid = QuasiMonteCarlo.sample(nb_samples, lb, ub, sampler)
 
 # Generate the samples
 asm1_samples = zeros(nb_samples, 14, size_samples)
-for i in 1:nb_samples
-    asm1_samples[i, :, :] = hcat(generate_samples(p_grid[:,i]).u...)
+l = Threads.ReentrantLock()
+Threads.@threads for i in 1:nb_samples
+    sample = hcat(generate_samples(p_grid[:,i]).u...)
+    Threads.lock(l)
+    asm1_samples[i, :, :] = sample
+    Threads.unlock(l)
+    println("Sample $i/$nb_samples Done")
+    flush(stdout)
 end
 
-@save "/home/victor/Documents/code/asm1-simulator/data/samples.jld" p_samples asm1_samples 
+@save "/home/victor/Documents/code/asm1-simulator/data/test.jld" p_samples asm1_samples 
