@@ -1,4 +1,4 @@
-using GlobalSensitivity, Statistics, Plots, QuasiMonteCarlo, JLD, Random
+using GlobalSensitivity, Statistics, QuasiMonteCarlo, Random, Parameters
 
 ######################################################
 ### Function from the library GlobalSensitivity.jl ###
@@ -23,11 +23,10 @@ struct MatSpread{T1, T2}
     spread::T2
 end
 
-struct MorrisResult{T1, T2}
+struct MorrisResult{T1}
     means::T1
     means_star::T1
     variances::T1
-    elementary_effects::T2
 end
 
 function generate_design_matrix(p_range, p_steps, rng; len_design_mat = 10)
@@ -103,18 +102,16 @@ function generate_samples_Morris(method::Morris, p_range::AbstractVector;
 end
 
 
-function analysis_Morris(f, method::Morris, design_matrices, asm1_trajectories)
+function compute_indices_Morris(method::Morris, design_matrices, all_y)
 
     @unpack p_steps, relative_scale, num_trajectory, total_num_trajectory, len_design_mat = method
 
     multioutput = false
-    all_y = f(asm1_trajectories)
     multioutput = all_y isa AbstractMatrix
 
     effects = []
     for i in 1:num_trajectory
-        y1 = multioutput ? all_y[:, (i - 1) * len_design_mat + 1] :
-             all_y[(i - 1) * len_design_mat + 1]
+        y1 = multioutput ? all_y[:, (i - 1) * len_design_mat + 1] : all_y[(i - 1) * len_design_mat + 1]
         for j in ((i - 1) * len_design_mat + 1):((i * len_design_mat) - 1)
             y2 = y1
             del = design_matrices[:, j + 1] - design_matrices[:, j]
@@ -164,9 +161,7 @@ function analysis_Morris(f, method::Morris, design_matrices, asm1_trajectories)
         end
     end
 
-    MorrisResult(reduce(hcat, means), reduce(hcat, means_star), reduce(hcat, variances),
-                 effects)
+    MorrisResult(reduce(hcat, means), reduce(hcat, means_star), reduce(hcat, variances))
 
 end
-
 

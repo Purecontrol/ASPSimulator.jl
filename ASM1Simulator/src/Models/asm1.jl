@@ -1,4 +1,4 @@
-using DifferentialEquations, LaTeXStrings
+using DifferentialEquations
 
 """
 Return the differential equations for ASM1 model.
@@ -92,12 +92,16 @@ function get_default_parameters_asm1(; T = 15, get_R::Bool=true)
      push!(p, 200*(1.024^(T-15))) # KLa
 
      ### X_init ###
-     X_init =  [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699, 964.8992, 0.0093, 3.9350, 6.8924, 0.9580, 3.8453, 5.4213, 0.0]
+     X_init =  [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699, 964.8992, 0.0093, 3.9350, 6.8924, 0.9580, 3.8453, 5.4213, 1.0]
 
      return (p, X_init)
 
 end
 
+
+"""
+Return the stoichiometric matrix of the ASM1 model from the parameters given in stoichiometric_parameters.
+"""
 function get_stoichiometric_matrix(stoichiometric_parameters)
 
      Y_A = stoichiometric_parameters[1] ; Y_H = stoichiometric_parameters[2] ; f_P = stoichiometric_parameters[3] ; i_XB = stoichiometric_parameters[4] ; i_XP = stoichiometric_parameters[5]
