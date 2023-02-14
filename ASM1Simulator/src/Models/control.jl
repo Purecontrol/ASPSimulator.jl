@@ -7,12 +7,12 @@ Returns a CallbackSet that simulates the redox control of a bioreactor.
 function redox_control()
 
     # If the S_{NO} is near 0, then the aeration is turned on
-    S_NO_low(u,t,integrator) = u[9] < 2
+    S_NO_low(u,t,integrator) = u[9] < 0.5
     aeration_on!(integrator) = integrator.u[14] = 1
     redox_c1 = DiscreteCallback(S_NO_low, aeration_on!; save_positions=(false, false))
 
     # If the S_{NH} is near 0, then the aeration is turned off
-    S_NH_low(u,t,integrator) = u[10] < 2
+    S_NH_low(u,t,integrator) = u[10] < 0.5
     aeration_off!(integrator) = integrator.u[14] = 0
     redox_c2 = DiscreteCallback(S_NH_low, aeration_off!; save_positions=(false, false))
 
