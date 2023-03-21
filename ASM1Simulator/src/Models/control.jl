@@ -1,4 +1,4 @@
-using DifferentialEquations
+using DifferentialEquations, Interpolations
 include("../utils.jl")
 
 """
@@ -42,3 +42,25 @@ function clock_control(;t_aerating = 60.0, t_waiting = 60.0)
 
 end
 
+"""
+Returns a ContinuousCallback that simulates the external control of a bioreactor given as a time array and a control array.
+"""
+function external_control(array_t, array_u)
+
+    # Create a function that returns the control value at a given time
+    control = Interpolations.interpolate((array_t,), vcat(array_u[2:end], array_u[end]), Gridded(Linear()))
+
+    # Search for the change in the control value in the array_u
+    event_times = [0.0]
+    for i in 1:length(array_u)-1
+        if abs(array_u[i] - array_u[i+1]) > 0.5
+            push!(event_times, array_t[i])
+        end
+    end
+
+    # Create a callback that changes the control value at the given times
+    external_control_callback = PresetTimeCallback(event_times,(integrator) -> integrator.u[14] = abs(control(integrator.t)), save_positions=(false, false))
+
+    return external_control_callback
+
+end

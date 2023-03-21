@@ -36,14 +36,14 @@ end
 function FT_metric(samples; keep_nb_coef = 1, percentage_variance = 0)
 
     # Compute the FT for each species
-    nb_samples, nb_species, _ = size(samples)
+    nb_samples, nb_species, T = size(samples)
     T_center = Int(size(samples, 3) / 2)
-    results = Array{Array{Float64, 2}, 1}(undef, nb_species) 
+    results = Array{Array{Float64, 2}, 1}(undef, nb_species-1) 
     for i in 1:(nb_species-1)
 
         # Compute the FT
         println("############### Species $i ###############")
-        F_init = fftshift(fft(samples[:, i, :], 2), 2)
+        F_init = fft(samples[:, i, :], 2)
 
         # Determine the number of coefficients to keep
         if percentage_variance > 0
@@ -60,7 +60,7 @@ function FT_metric(samples; keep_nb_coef = 1, percentage_variance = 0)
         else
             index = keep_nb_coef
         end
-        results[i] = abs.(F_init[:, T_center-index:T_center])
+        results[i] = abs.(F_init[:, (1:index+1)])/T
 
     end
 
