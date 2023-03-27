@@ -13,8 +13,8 @@ tsave = LinRange(9, 10, 1440)
 ode_prob = ODEProblem(ASM1Simulator.Models.asm1!, X_init, tspan, real_p)
 
 # Generate the real solution
-sol_real_complete = solve(ode_prob, Rosenbrock23(), reltol = 1e-8, saveat = tsave_complete, callback=ASM1Simulator.Models.redox_control())
-sol_real = solve(ode_prob, Rosenbrock23(), reltol = 1e-8, saveat = tsave, callback=ASM1Simulator.Models.external_control(tsave_complete, getindex.(sol_real_complete.u, 14)))
+sol_real_complete = solve(ode_prob, Tsit5(), saveat = tsave_complete, callback=ASM1Simulator.Models.redox_control())
+sol_real = solve(ode_prob, Tsit5(), saveat = tsave, callback=ASM1Simulator.Models.external_control(tsave_complete, getindex.(sol_real_complete.u, 14)))
 
 ### Estimate the parameters ###
 function loss(u, p)
@@ -33,20 +33,25 @@ function loss(u, p)
     X_init_sim[11:13] = u[27:29]
 
     # Simulate the model
-    sol = solve(remake(ode_prob, tspan=tspan,p=p_sim, u0=X_init_sim), Rosenbrock23(), reltol = 1e-8, saveat = tsave, callback=ASM1Simulator.Models.external_control(tsave_complete, getindex.(sol_real_complete.u, 14)), verbose=false)
+    sol = solve(remake(ode_prob, tspan=tspan,p=p_sim, u0=X_init_sim), Tsit5(), saveat = tsave, callback=ASM1Simulator.Models.external_control(tsave_complete, getindex.(sol_real_complete.u, 14)), verbose=true)
     
-    # Compute the loss
-    O2 = getindex.(sol.u, 8)
-    NO = getindex.(sol.u, 9)
-    NH = getindex.(sol.u, 10)  
+    if sol.retcode == :Success
+        # Compute the loss
+        O2 = getindex.(sol.u, 8)
+        NO = getindex.(sol.u, 9)
+        NH = getindex.(sol.u, 10)  
 
-    loss = mean((O2 .- getindex.(sol_real.u, 8)).^2) + mean((NO .- getindex.(sol_real.u, 9)).^2) + mean((NH .- getindex.(sol_real.u, 10)).^2)
-
+        loss = mean((O2 .- getindex.(sol_real.u, 8)).^2) + mean((NO .- getindex.(sol_real.u, 9)).^2) + mean((NH .- getindex.(sol_real.u, 10)).^2)
+    else
+        println("Error: ", sol.retcode)
+        loss = 1/sol.t[end]
+    end
     return loss
 end
 
 # Generate an initial solution
-bounds = vcat([[i*0.2, i*1.8] for i in vcat(real_p_vec[1:2]...)], [[i*0.2, i*1.8] for i in vcat(real_p_vec[6:7]...)], [[i*0.2, i*1.8] for i in X_init[[2, 4, 5, 6, 7, 11, 12, 13]]])
+p_lower, p_upper, X_init_lower, X_init_upper = ASM1Simulator.Models.get_bounds_parameters_asm1()
+bounds = vcat([[p_lower[1][i], p_upper[1][i]] for i in 1:size(real_p_vec[1], 1)], [[p_lower[2][i], p_upper[2][i]] for i in 1:size(real_p_vec[2], 1)], [[p_lower[6], p_upper[6]]], [[p_lower[7], p_upper[7]]], [[X_init_lower[i], X_init_upper[i]] for i in [2, 4, 5, 6, 7, 11, 12, 13]])
 lb = [i[1] for i in bounds] ; ub = [i[2] for i in bounds]
 p_init = lb + rand(29).*(ub-lb)
 
@@ -55,8 +60,8 @@ p_init = lb + rand(29).*(ub-lb)
 #################################################################
 
 # Define the bounds on the variables
-lb_optim = zeros(29)#lb.*0.2
-ub_optim = [Inf for i in 1:29]#ub.*1.8
+lb_optim = zeros(29) .+ 0.0001
+ub_optim = [10000.0 for i in 1:29]
 
 # Define the optimizer and the options
 nb_iter = 10

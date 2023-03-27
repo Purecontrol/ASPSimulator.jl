@@ -36,6 +36,8 @@ function asm1!(dX, X, p, t)
      ### Calculate differential equations ###
      # General expression
      dX[1:13] .= (Q_in/volume) * (X_in .- X[1:13]) .+ R * process_rates
+     dX[14] = 0.0
+
      # Control input for oxygen
      dX[8] += X[14] * KLa * (SO_sat - X[8])
 
@@ -98,6 +100,54 @@ function get_default_parameters_asm1(; T = 15, get_R::Bool=true)
 
 end
 
+"""
+Return the lower and upper bounds for the parameters and the initial condtions of the ASM1 model given in the literature.
+"""
+function get_bounds_parameters_asm1()
+
+     ### Set the lower and upper bounds vectors###
+     p_lower = [] ; p_upper = []
+
+     ### Kinetic parameters ###
+     μ_H_lower = 3.0 ; K_S_lower = 5.0 ; K_OH_lower = 0.1 ; K_NO_lower = 0.25 ; b_H_lower = 0.05 ; η_g_lower = 0.64 ; η_h_lower = 0.64 ; k_h_lower = 0.05 ; K_X_lower = 0.015 ; μ_A_lower = 0.34 ; K_NH_lower = 0.5 ; b_A_lower = 0.05 ; K_OA_lower =  0.2 ; k_a_lower = 0.025
+     kinetic_parameters_lower = [μ_H_lower, K_S_lower, K_OH_lower, K_NO_lower, b_H_lower, η_g_lower, η_h_lower, k_h_lower, K_X_lower, μ_A_lower, K_NH_lower, b_A_lower, K_OA_lower, k_a_lower]
+     push!(p_lower, kinetic_parameters_lower)
+
+     μ_H_upper = 13.2 ; K_S_upper = 15.0 ; K_OH_upper = 0.3 ; K_NO_upper = 0.75 ; b_H_upper = 1.6 ; η_g_upper = 0.96 ; η_h_upper = 0.96 ; k_h_upper = 4.5 ; K_X_upper = 0.045 ; μ_A_upper = 0.65 ; K_NH_upper = 1.5 ; b_A_upper = 0.15 ; K_OA_upper =  0.6 ; k_a_upper = 0.075
+     kinetic_parameters_upper = [μ_H_upper, K_S_upper, K_OH_upper, K_NO_upper, b_H_upper, η_g_upper, η_h_upper, k_h_upper, K_X_upper, μ_A_upper, K_NH_upper, b_A_upper, K_OA_upper, k_a_upper]
+     push!(p_upper, kinetic_parameters_upper)
+
+     ### Stoichiometric parameters ###
+     Y_A_lower = 0.07 ; Y_H_lower = 0.46 ; f_P_lower = 0.076 ; i_XB_lower = 0.076 ; i_XP_lower = 0.057
+     stoichiometric_parameters_lower = [Y_A_lower, Y_H_lower, f_P_lower, i_XB_lower, i_XP_lower]
+     push!(p_lower, stoichiometric_parameters_lower)
+
+     Y_A_upper = 0.28 ; Y_H_upper = 0.69 ; f_P_upper = 0.084 ; i_XB_upper = 0.084 ; i_XP_upper = 0.063
+     stoichiometric_parameters_upper = [Y_A_upper, Y_H_upper, f_P_upper, i_XB_upper, i_XP_upper]
+     push!(p_upper, stoichiometric_parameters_upper)
+
+     ### Other parameters ###
+     push!(p_lower, 1333.0) # volume
+     push!(p_upper, 1333.0) # volume
+
+     push!(p_lower, [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699, 964.8992, 0.0093, 3.9350, 6.8924, 0.9580, 3.8453, 5.4213]) # X_in
+     push!(p_upper, [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699, 964.8992, 0.0093, 3.9350, 6.8924, 0.9580, 3.8453, 5.4213]) # X_in
+
+     push!(p_lower, 18061.0) # Q_in
+     push!(p_upper, 18061.0) # Q_in
+
+     ### Control parameters : Redox control ###
+     push!(p_lower, 4.36) # SO_sat
+     push!(p_upper, 11.46) # SO_sat
+     push!(p_lower, 100) # KLa
+     push!(p_upper, 400) # KLa
+
+     ### X_init ###
+     X_init_lower = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1.0]
+     X_init_upper = [1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1.0]
+
+     return (p_lower, p_upper, X_init_lower, X_init_upper)
+end
 
 """
 Return the stoichiometric matrix of the ASM1 model from the parameters given in stoichiometric_parameters.
@@ -123,3 +173,5 @@ function get_stoichiometric_matrix(stoichiometric_parameters)
      return R
 
 end
+
+
