@@ -33,20 +33,21 @@ function loss(u, p)
     X_init_sim[11:13] = u[27:29]
 
     # Simulate the model
-    sol = solve(remake(ode_prob, tspan=tspan,p=p_sim, u0=X_init_sim), Tsit5(), saveat = tsave, callback=ASM1Simulator.Models.external_control(tsave_complete, getindex.(sol_real_complete.u, 14)), verbose=true)
+    sol = solve(remake(ode_prob, tspan=tspan,p=p_sim, u0=X_init_sim), Tsit5(), saveat = tsave, callback=ASM1Simulator.Models.external_control(tsave_complete, getindex.(sol_real_complete.u, 14)), verbose=false, maxiters=Int(5*1e4))
     
-    if sol.retcode == :Success
+    # prior_loss = mean((u[1:14] .- p[1]).^2) + mean((u[15:19] .- p[2]).^2) + mean((u[20] .- p[6]).^2) + mean((u[21] .- p[7]).^2)
+    if sol.retcode == ReturnCode.Success
         # Compute the loss
         O2 = getindex.(sol.u, 8)
         NO = getindex.(sol.u, 9)
         NH = getindex.(sol.u, 10)  
 
-        loss = mean((O2 .- getindex.(sol_real.u, 8)).^2) + mean((NO .- getindex.(sol_real.u, 9)).^2) + mean((NH .- getindex.(sol_real.u, 10)).^2)
+        l2_loss = mean((O2 .- getindex.(sol_real.u, 8)).^2) + mean((NO .- getindex.(sol_real.u, 9)).^2) + mean((NH .- getindex.(sol_real.u, 10)).^2)
     else
         println("Error: ", sol.retcode)
-        loss = 1/sol.t[end]
+        l2_loss = 1000000
     end
-    return loss
+    return l2_loss
 end
 
 # Generate an initial solution
@@ -65,8 +66,8 @@ ub_optim = [10000.0 for i in 1:29]
 
 # Define the optimizer and the options
 nb_iter = 10
-nb_particules = 4
-optimizer = Optim.ParticleSwarm(lower=lb_optim, upper=ub_optim, n_particles=nb_particules)
+nb_particules = 10
+optimizer = Optim.ParticleSwarm(lower=lb_optim, lower_ini=lb, upper=ub_optim, upper_ini=ub, n_particles=nb_particules)
 options = Optim.Options(iterations=nb_iter, extended_trace=true, store_trace=true, show_trace=true, show_every=2)
 
 # Solve the problem
