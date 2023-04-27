@@ -1,4 +1,5 @@
 using DifferentialEquations
+using DelimitedFiles:readdlm
 
 """
 Return the differential equations for ASM1 model.
@@ -22,6 +23,16 @@ function asm1!(dX, X, p, t)
      R = p[2]
      # Other parameters 
      volume = p[3] ; X_in = p[4] ; Q_in = p[5] ; SO_sat = p[6] ; KLa = p[7]
+
+     # If Q_in is a function of the time t, then evaluate it
+     if typeof(Q_in) <: Function
+          Q_in = Q_in(t)
+     end
+
+     # If X_in is a function of the time t, then evaluate it
+     if typeof(X_in) <: Function
+          X_in = X_in(t)
+     end
 
      ### Calculate process rates ###
      process_rates = [μ_H*(X[2]/(K_S+X[2]))*(X[8]/(K_OH+X[8]))*X[5], # Aerobic growth of heterotrophs
@@ -47,7 +58,7 @@ end
 """
 Return the default parameters for ASM1 model.
 """
-function get_default_parameters_asm1(; T = 15, get_R::Bool=true)
+function get_default_parameters_asm1(; T = 15, get_R::Bool=true, influent_file_path = nothing)
 
      ### Define the function that adapts the parameters according to the temperature ###
      function T_var(T, ρ, a)
@@ -86,8 +97,27 @@ function get_default_parameters_asm1(; T = 15, get_R::Bool=true)
 
      ### Other parameters ###
      push!(p, 1333.0) # volume
-     push!(p, [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699, 964.8992, 0.0093, 3.9350, 6.8924, 0.9580, 3.8453, 5.4213]) # X_in
-     push!(p, 18061.0) # Q_in
+
+     if false #influent_file_path ≠ nothing
+          inflow_generator = readdlm(influent_file_path)
+          list_order = [7, 2, 5, 4, 3, 0.0, 0.0, 0.0, 0.0, 6, 8, 9, 7.0]
+          function X_in(t) 
+               return [[(typeof(list_order[i]) ==  Int) ? interpolate((inflow_generator[: ,1], ), inflow_generator[: ,list_order[i]], Gridded(Linear())) :  interpolate((inflow_generator[: ,1], ), list_order[i] .* ones(size(inflow_generator, 1)), Gridded(Linear())) for i in 1:13][i](abs(t) .% maximum(inflow_generator[: ,1])) for i in 1:13]
+          end
+     else
+          X_in =  [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699, 964.8992, 0.0093, 3.9350, 6.8924, 0.9580, 3.8453, 5.4213]
+     end
+     push!(p, X_in) # X_in
+     
+     if influent_file_path ≠ nothing
+          inflow_generator = readdlm(influent_file_path)
+          function Q_in(t) 
+               return interpolate((inflow_generator[: ,1], ), inflow_generator[: ,10], Gridded(Linear()))(abs(t) .% maximum(inflow_generator[: ,1]))
+          end
+     else
+          Q_in = 18061.0
+     end
+     push!(p, Q_in) # Q_in
 
      ### Control parameters : Redox control ###
      push!(p, (8/10.50237016)*6791.5*(56.12*exp(-66.7354 + 87.4755/((T+273.15)/100.0) + 24.4526*log((T+273.15)/100.0)))) # SO_sat
