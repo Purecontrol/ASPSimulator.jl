@@ -68,3 +68,4 @@ function PeriodicOffsetCallback(f, Δt::Number;
 
     DiscreteCallback(condition, affect!; initialize = initialize_periodic, kwargs...)
 end
+

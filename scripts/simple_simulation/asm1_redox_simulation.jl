@@ -3,7 +3,8 @@ using ASM1Simulator
 
 ### Define the model ###
 # Get default parameters
-p, X_init = ASM1Simulator.Models.get_default_parameters_asm1()
+influent_file_path = "/home/victor/Documents/code/asm1-simulator/data/external/influent_files/dryinfluent.ascii"
+p, X_init = ASM1Simulator.Models.get_default_parameters_asm1(influent_file_path=influent_file_path)
 
 # Define the ODE problem
 tspan = (0, 20)

@@ -54,7 +54,6 @@ function asm1!(dX, X, p, t)
 
 end
 
-
 """
 Return the default parameters for ASM1 model.
 """
@@ -98,11 +97,12 @@ function get_default_parameters_asm1(; T = 15, get_R::Bool=true, influent_file_p
      ### Other parameters ###
      push!(p, 1333.0) # volume
 
-     if false #influent_file_path ≠ nothing
+     if false#influent_file_path ≠ nothing
           inflow_generator = readdlm(influent_file_path)
           list_order = [7, 2, 5, 4, 3, 0.0, 0.0, 0.0, 0.0, 6, 8, 9, 7.0]
+          constant_value = [0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1]
           function X_in(t) 
-               return [[(typeof(list_order[i]) ==  Int) ? interpolate((inflow_generator[: ,1], ), inflow_generator[: ,list_order[i]], Gridded(Linear())) :  interpolate((inflow_generator[: ,1], ), list_order[i] .* ones(size(inflow_generator, 1)), Gridded(Linear())) for i in 1:13][i](abs(t) .% maximum(inflow_generator[: ,1])) for i in 1:13]
+               return [[(constant_value[i] ==  0) ? interpolate((inflow_generator[: ,1], ), inflow_generator[: ,Int(list_order[i])], Gridded(Linear())) :  interpolate((inflow_generator[: ,1], ), list_order[i] .* ones(size(inflow_generator, 1)), Gridded(Linear())) for i in 1:13][i](abs(t) .% maximum(inflow_generator[: ,1])) for i in 1:13]
           end
      else
           X_in =  [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699, 964.8992, 0.0093, 3.9350, 6.8924, 0.9580, 3.8453, 5.4213]
@@ -182,7 +182,7 @@ end
 """
 Return the stoichiometric matrix of the ASM1 model from the parameters given in stoichiometric_parameters.
 """
-function get_stoichiometric_matrix(stoichiometric_parameters)
+function get_stoichiometric_matrix_asm1(stoichiometric_parameters)
 
      Y_A = stoichiometric_parameters[1] ; Y_H = stoichiometric_parameters[2] ; f_P = stoichiometric_parameters[3] ; i_XB = stoichiometric_parameters[4] ; i_XP = stoichiometric_parameters[5]
      
@@ -203,5 +203,3 @@ function get_stoichiometric_matrix(stoichiometric_parameters)
      return R
 
 end
-
-

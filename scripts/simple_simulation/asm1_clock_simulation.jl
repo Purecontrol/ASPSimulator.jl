@@ -3,16 +3,17 @@ using ASM1Simulator
 
 ### Define the model ###
 # Get default parameters
-p, X_init = ASM1Simulator.Models.get_default_parameters_asm1()
+influent_file_path = "/home/victor/Documents/code/asm1-simulator/data/external/influent_files/dryinfluent.ascii"
+p, X_init = ASM1Simulator.Models.get_default_parameters_asm1(influent_file_path=influent_file_path)
 
 # Define the ODE problem
-tspan = (0, 20)
-tsave = LinRange(19, 20, 1000)
+tspan = (0, 5)
+tsave = LinRange(4, 5, 1440)
 prob = ODEProblem(ASM1Simulator.Models.asm1!, X_init, tspan, p)
 
 ### Solve the ODE ###
 # Solve the problem
-@time sol = solve(prob, reltol = 1e-8, saveat = tsave, callback=ASM1Simulator.Models.clock_control(t_waiting = 120.0))
+@time sol = solve(prob, saveat = tsave, callback=ASM1Simulator.Models.clock_control(t_waiting = 120.0), progress=true, reltol = 1e-4, abstol = 1e-4)
 
 # Plot the solution
 names = latexstring.(["S_I", "S_S", "X_I", "X_S", "X_{B,H}", "X_{B,A}", "X_P", "S_O", "S_{NO}", "S_{NH}", "S_{ND}", "X_{ND}", "S_{ALK}"])
