@@ -161,11 +161,11 @@ function get_bounds_parameters_simplified_asm1()
      push!(p_upper, kinetic_parameters_upper)
 
      ### Additional parameters ###
-     θ_1_lower = 0.0001 ; θ_2_lower = 0.0001 ; θ_3_lower = 0.0001 ; θ_4_lower = 0.0001 ; θ_5_lower = 0.0001
+     θ_1_lower = 5000.0 ; θ_2_lower = 50.0 ; θ_3_lower = 10.0 ; θ_4_lower = 10.0 ; θ_5_lower = 1.0
      additional_parameters_lower = [θ_1_lower, θ_2_lower, θ_3_lower, θ_4_lower, θ_5_lower]
      push!(p_lower, additional_parameters_lower)
 
-     θ_1_upper = 10000.0 ; θ_2_upper = 10000.0 ; θ_3_upper = 10000.0 ; θ_4_upper = 10000.0 ; θ_5_upper = 10000.0
+     θ_1_upper = 50000.0 ; θ_2_upper = 10000.0 ; θ_3_upper = 500.0 ; θ_4_upper = 500.0 ; θ_5_upper = 1000.0
      additional_parameters_upper = [θ_1_upper, θ_2_upper, θ_3_upper, θ_4_upper, θ_5_upper]
      push!(p_upper, additional_parameters_upper)
 
@@ -179,8 +179,8 @@ function get_bounds_parameters_simplified_asm1()
      push!(p_upper, stoichiometric_parameters_upper)
 
      ### Other parameters ###
-     push!(p_lower, 1333.0) # volume
-     push!(p_upper, 1333.0) # volume
+     push!(p_lower, 600.0) # volume
+     push!(p_upper, 3000.0) # volume
 
      push!(p_lower, [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699, 964.8992, 0.0093, 3.9350, 6.8924, 0.9580, 3.8453, 5.4213]) # X_in
      push!(p_upper, [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699, 964.8992, 0.0093, 3.9350, 6.8924, 0.9580, 3.8453, 5.4213]) # X_in
@@ -196,7 +196,7 @@ function get_bounds_parameters_simplified_asm1()
 
      ### X_init ###
      X_init_lower = [0, 0, 0, 0, 0, 1.0]
-     X_init_upper = [1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1.0]
+     X_init_upper = [100.0, 100.0, 100.0, 100.0, 100.0, 1.0]
 
      return (p_lower, p_upper, X_init_lower, X_init_upper)
 end
