@@ -123,12 +123,21 @@ nb_particules = 300
 optimizer = Optim.ParticleSwarm(lower=lb, lower_ini=lb, upper=ub, upper_ini=ub, n_particles=nb_particules)
 options = Optim.Options(iterations=nb_iter, extended_trace=true, store_trace=true, show_trace=true, show_every=2)
 
-res = optimize(u -> L2_loss(u, model(u), y_train[.! isnan.(y_train)]), p_init, optimizer, options)
+y_opt_train = reshape(y_train[.! isnan.(y_train)], (nb_obs_var, Int(T_training*1440/dt_obs)))
+res = optimize(u -> L2_loss(u, model(u), y_opt_train), p_init, optimizer, options)
 
 # plot(1:dt_obs:Int(T_training*1440), model(res.minimizer)', label="Solution") # model(res.minimizer)
 # plot!((H*x_train)', label="True state")
 # scatter!(y_train', label="Observed state")
 # plot!(xformatter = x -> Dates.format(DateTime(2023, 1, 1) + Dates.Minute(x), "Jd - Hh"))
+
+
+opt_params = [1.0, 0.1, 0.25, 0.9599962529003409, 0.64, 5.3354001336455275, 1.5, 0.6, 5000.0, 50.0, 10.0, 10.002464626798378, 1000.0, 0.28, 0.6594666694156143, 0.084, 3000.0, 4.36, 100.00082216236575, 0.0, 0.0, 100.0, 1.1448518693606955]
+
+plot(1:dt_obs:Int(T_training*1440), model(p_init)', label="Solution") # model(res.minimizer)
+plot!((H*x_train)', label="True state")
+scatter!(y_train', label="Observed state")
+plot!(xformatter = x -> Dates.format(DateTime(2023, 1, 1) + Dates.Minute(x), "Jd - Hh"))
 
 
 # Save the results
