@@ -10,7 +10,7 @@ max_iter_integrator = 10e4
 #### Link observation model with simplified model ####
 ######################################################
 
-index_obs_simplified_var = [4]
+index_obs_simplified_var = [2, 4]
 nb_obs_var = size(index_obs_simplified_var, 1)
 link_index_real_system = [[2, 4], [8], [9], [10], [11], [14]] 
 
@@ -86,7 +86,7 @@ function model(opt_params)
         println(e)
     end
 
-    return H_simplified*x̂
+    return x̂#H_simplified*x̂
 
 end
 
@@ -118,27 +118,21 @@ lb = [i[1] for i in bounds] ; ub = [i[2] for i in bounds]
 p_init = lb + rand(nb_opt_params).*(ub-lb)
 
 # Define the optimizer and the options
-nb_iter = 1000
-nb_particules = 300
+nb_iter = 300
+nb_particules = 500
 optimizer = Optim.ParticleSwarm(lower=lb, lower_ini=lb, upper=ub, upper_ini=ub, n_particles=nb_particules)
 options = Optim.Options(iterations=nb_iter, extended_trace=true, store_trace=true, show_trace=true, show_every=2)
 
 y_opt_train = reshape(y_train[.! isnan.(y_train)], (nb_obs_var, Int(T_training*1440/dt_obs)))
-res = optimize(u -> L2_loss(u, model(u), y_opt_train), p_init, optimizer, options)
+res = optimize(u -> L2_loss(u, H_simplified*model(u), y_opt_train), p_init, optimizer, options)
 
-# plot(1:dt_obs:Int(T_training*1440), model(res.minimizer)', label="Solution") # model(res.minimizer)
+# Quality results
+# opt_params = res.minimizer
+# plot(1:dt_obs:Int(T_training*1440), (H_simplified*model(opt_params))', label="Solution") # model(res.minimizer)
+# plot!(1:dt_obs:Int(T_training*1440), (H_simplified*model(theorical_opt_params))', label="Theoric")
 # plot!((H*x_train)', label="True state")
 # scatter!(y_train', label="Observed state")
 # plot!(xformatter = x -> Dates.format(DateTime(2023, 1, 1) + Dates.Minute(x), "Jd - Hh"))
-
-
-opt_params = [1.0, 0.1, 0.25, 0.9599962529003409, 0.64, 5.3354001336455275, 1.5, 0.6, 5000.0, 50.0, 10.0, 10.002464626798378, 1000.0, 0.28, 0.6594666694156143, 0.084, 3000.0, 4.36, 100.00082216236575, 0.0, 0.0, 100.0, 1.1448518693606955]
-
-plot(1:dt_obs:Int(T_training*1440), model(p_init)', label="Solution") # model(res.minimizer)
-plot!((H*x_train)', label="True state")
-scatter!(y_train', label="Observed state")
-plot!(xformatter = x -> Dates.format(DateTime(2023, 1, 1) + Dates.Minute(x), "Jd - Hh"))
-
 
 # Save the results
 try
@@ -148,53 +142,13 @@ catch
     cd("asm1-simulator/data/processed/whitebox/")
 end
 
-@save "experiment_1.jld" res x_train y_train
+@save "experiment_4.jld" res x_train y_train
 
-# nb_test = 100
-
-# p_test_tab = [lb_optim + rand(nb_opt_params).*(ub-lb) for i in 1:nb_test]
-
-# choosen_integrator = Rosenbrock23() ## #Tsit5()
-
-# # Cheat => OwrenZen3()
-
-# # Euler() => why not but i have to choose the dt, non-stable*
-
-# @showprogress 1 "Estimating value particles" for i in 1:5
-
-# end
-
-
-
-
-
-
-# time_tab = []
-# for i in 1:nb_test
-#     println("#### Test ", i, " ####")
-
-#     p_test = p_test_tab[i]
-
-#     t_start = time()
-#     res = model(p_test)
-#     t_end = time()
-
-#     println("Time : ", (t_end - t_start), " s")
-
-#     push!(time_tab, (t_end - t_start))
-# end
-
-# mean(time_tab)
-
-
-
-
-
-
-
-
-
-
-    
-# plot(1:dt_obs:Int(T_training*1440),(H_simplified*model(opt_params))')
-# plot!((H*x_train)')
+# Quality reconstruction non-observed variable
+# res = load("experiment_2.jld")
+# opt_params = res["res"].minimizer
+# id = 2
+# plot(1:dt_obs:Int(T_training*1440), model(opt_params)[id, :], label="Solution") # model(res.minimizer)
+# plot!(1:dt_obs:Int(T_training*1440), model(theorical_opt_params)[id, :], label="Theoric")
+# plot!(sum(x_train[link_index_real_system[id], :], dims=1)', label="True state")
+# plot!(xformatter = x -> Dates.format(DateTime(2023, 1, 1) + Dates.Minute(x), "Jd - Hh"))

@@ -6,14 +6,14 @@ include("env.jl")
 
 # User-defined parameters
 T_steady_state = 20 #(in days)
-T_training = 1.0 #(in days)
+T_training = 5.0 #(in days)
 T_testing = 1.5 #(in days)
 σ_ϵ = 0.5
 dt_obs = 5 #(in minutes)
 
 # Fixed parameters
 nb_var = 14
-index_obs_var = [10]
+index_obs_var = [8, 10]
 nb_obs_var = size(index_obs_var, 1)
 
 ####################################################################################################################
@@ -40,8 +40,8 @@ x_train = hcat(sol_real.u...)[:, 1:Int(T_training*1440)]
 x_test = hcat(sol_real.u...)[:, (Int(T_training*1440)+1):end]
 
 # Get training and test set for the observation of the system
-y_train = H*x_train + rand(Normal(0, σ_ϵ), (nb_obs_var, size(x_train, 2))) + reshape([(i-1)%Int(dt_obs) == 0 ? 0 : NaN for i in 1:size(x_train, 2)], (1,size(x_train, 2)))
-y_test = H*x_test + rand(Normal(0, σ_ϵ), (nb_obs_var, size(x_test, 2))) + reshape([(i-1)%Int(dt_obs) == 0 ? 0 : NaN for i in 1:size(x_test, 2)], (1,size(x_test, 2)))
+y_train = H*x_train + rand(Normal(0, σ_ϵ), (nb_obs_var, size(x_train, 2))) + vcat([reshape([(i-1)%Int(dt_obs) == 0 ? 0 : NaN for i in 1:size(x_train, 2)], (1,size(x_train, 2))) for i in 1:nb_obs_var]...)
+y_test = H*x_test + rand(Normal(0, σ_ϵ), (nb_obs_var, size(x_test, 2))) + vcat([reshape([(i-1)%Int(dt_obs) == 0 ? 0 : NaN for i in 1:size(x_test, 2)], (1,size(x_test, 2)))  for i in 1:nb_obs_var]...)
 
 # Get control variables of the system
 U_train = transpose(hcat(getindex.(sol_real.u, 14)...))[1:Int(T_training*1440), :]
