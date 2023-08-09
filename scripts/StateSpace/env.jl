@@ -11,6 +11,13 @@ mutable struct ODECore
     params_vec::Vector{Any}
     index_u::Vector{Int64}
 
+    # Constructor with all the arguments
+    function ODECore(current_t, fixed_dt, ode_fct!, state, params_vec, index_u)
+
+        return new(current_t, fixed_dt, ode_fct!, state, params_vec, index_u)
+
+    end
+
     # Default constructor with no arguments
     function ODECore()
 
@@ -36,7 +43,7 @@ function reset!(env::ODECore; init_state=Nothing, params_vec=Nothing, influent_f
 
 end
 
-function step!(env::ODECore, action::Union{Vector{}, CallbackSet})
+function step!(env::ODECore, action::Union{Vector{Any}, CallbackSet})
 
     # Copy init state
     init_state = deepcopy(env.state)
@@ -71,7 +78,7 @@ function step!(env::ODECore, action::Union{Vector{}, CallbackSet})
 
 end
 
-function multi_step!(env::ODECore, action::Union{Vector{Vector{}}, CallbackSet}, n_steps::Union{Int64, Period})
+function multi_step!(env::ODECore, action::Union{Vector{Vector{Float64}}, CallbackSet}, n_steps::Union{Int64, Period})
 
     # Convert period to timestep if it is the case
     n_steps = isa(n_steps, Period) ? Int(Dates.value(convert(Dates.Second, n_steps))/(env.fixed_dt*(24*60*60))) : n_steps
@@ -85,7 +92,7 @@ function multi_step!(env::ODECore, action::Union{Vector{Vector{}}, CallbackSet},
         @assert all([size(a_t, 1) for a_t in action] .== size(env.index_u, 1)) "The size of all the second dimension of the action need to be equal to the size of env.index_u."
 
         # Update control index of init state with choosen action
-        action = external_control([env.current_t + (i-1)*env.fixed_dt for i in 1:n_steps], vcat(action...); index_u = env.index_u[1])
+        action = ASM1Simulator.Models.external_control([env.current_t + (i-1)*env.fixed_dt for i in 1:n_steps], vcat(action...); index_u = env.index_u[1])
 
     end
 

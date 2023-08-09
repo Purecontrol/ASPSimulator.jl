@@ -113,10 +113,12 @@ function llh(params_vec, ssm_model)
 end
 
 x0 = [1333.0, 200.0, -2.30, -2.30]
+x0 = [10, 10.0, 5.30, 5.30]
+x0 = [5000.0, 10.0, 5.30, 5.30]
 p = ssm
 optprob = OptimizationFunction(llh, Optimization.AutoForwardDiff())
 prob = Optimization.OptimizationProblem(optprob, x0, p)
-sol = solve(prob, Optim.Newton(), maxiters = 1000, progress= true, store_trace=true) #Adam(0.01) #, show_trace=true, show_every=1, extended_trace=true
+sol = solve(prob, Optim.BFGS(), maxiters = 1000, progress= true, store_trace=true) #Adam(0.01) #, show_trace=true, show_every=1, extended_trace=true
 
 print(sol.original)
 
@@ -131,16 +133,37 @@ println("σ_obs   | Estimated = ", round(sqrt(exp(sol.minimizer[4])), digits=3),
 ###################################################
 
 # Update parameter vectors with optimized values
-ssm.parameters = sol.minimizer
+ssm.parameters = sol.minimizer#[817.3783503399302, 185.8007718508432, -2.512790998088006, -3.9909505087348265]#sol_test.minimizer
 
 X_hat_train, Y_hat_train, P_hat_train = forecast(ssm, exogenous_variables, U_train; steps_ahead=Int(1440*T_training))
 
 filtered_X̂t, filtered_P̂t, predicted_X̂t, predicted_P̂t, K, L, S, v = kalman_filter(ssm, y_train, exogenous_variables, U_train)
 
-smoothed_X̂t, smoothed_P̂t = kalman_smoother(ssm, y_train, exogenous_variables, U_train, predicted_X̂t, predicted_P̂t, K, L, S, v)
+smoothed_X̂t, smoothed_P̂t, N = kalman_smoother(ssm, y_train, exogenous_variables, U_train, predicted_X̂t, predicted_P̂t, L, S, v)
+
+smoothed_ϵt, smoothed_ηt, smoothed_var_ϵt, smoothed_var_ηt = kalman_disturbance_smoother(ssm, y_train, exogenous_variables, U_train, K, L, S, v)
+
+smoothed_pairwise_P̂t = kalman_pair_smoother(ssm, y_train, exogenous_variables, U_train, N, predicted_P̂t, L)
+
+l_plot = 722
+
+# EM(y_train, ssm, exogenous_variables, U_train, sol.minimizer)
+
+@timed EM(y_train, ssm, exogenous_variables, U_train, sol.minimizer)
+
+@timed loss_tab = EM2(y_train, ssm, exogenous_variables, U_train, [826.8134453448635, 187.7418534868474, -2.30, -2.30])
 
 
-l_plot = 400
+x0 = minimizer #[5000.0, 10.0, 5.30, 5.30]
+@timed loss_tab = EM3(y_train, ssm, exogenous_variables, U_train, x0)
+
+@timed loss_tab = EM4(y_train, ssm, exogenous_variables, U_train, x0)
+
+@timed loss_tab, minimizer = EM5(y_train, ssm, exogenous_variables, U_train, x0)
+
+
+
+@timed llh(sol.minimizer, ssm)
 
 plot(collect(1:(Int(1440*T_training) + 1))[1:l_plot], hcat(smoothed_X̂t...)[1,1:l_plot] - 0.96*sqrt.(abs.(hcat(smoothed_P̂t...)[1,1:l_plot])), fillrange = hcat(smoothed_X̂t...)[1,1:l_plot] + 0.96*sqrt.(abs.(hcat(smoothed_P̂t...)[1,1:l_plot])), fillalpha = 0.35, c = 1, label = "IC 95%", lw=0)
 plot!(collect(1:(Int(1440*T_training)))[1:l_plot], hcat(filtered_X̂t...)[1,1:l_plot] - 0.96*sqrt.(hcat(filtered_P̂t...)[1,1:l_plot]), fillrange = hcat(filtered_X̂t...)[1,1:l_plot] + 0.96*sqrt.(hcat(filtered_P̂t...)[1,1:l_plot]), fillalpha = 0.35, c = 2, label = "IC 95%", lw=0)
