@@ -6,14 +6,14 @@ include("env.jl")
 
 # User-defined parameters
 T_steady_state = 20 #(in days)
-T_training = 1.0 #(in days)
+T_training = 0.25 #(in days)
 T_testing = 1.5 #(in days)
 σ_ϵ = 0.5
 dt_obs = 5 #(in minutes)
 
 # Fixed parameters
 nb_var = 14
-index_obs_var = [10]
+index_obs_var = [8, 10]
 nb_obs_var = size(index_obs_var, 1)
 
 ####################################################################################################################

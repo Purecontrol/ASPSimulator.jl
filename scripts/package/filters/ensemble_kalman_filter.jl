@@ -86,16 +86,16 @@ function filter!(filter_output::EnsembleKalmanFilterOutput, sys::StateSpaceSyste
         t_step = filter.init_state_x.t + (t-1)*sys.dt
 
 
-        R = sys.R_t(exogenous_variables, parameters, t_step)
-        Q = sys.Q_t(exogenous_variables, parameters, t_step)
+        R = sys.R_t(exogenous_variables[t, :], parameters)
+        Q = sys.Q_t(exogenous_variables[t, :], parameters)
 
         # Define actual transition and observation operators
         function M(x)
-            return transition(sys, x, exogenous_variables, control_variables[t, :], parameters, t_step)
+            return transition(sys, x, exogenous_variables[t, :], control_variables[t, :], parameters)
         end
 
         function H(x)
-            return observation(sys, x, exogenous_variables, parameters, t_step)
+            return observation(sys, x, exogenous_variables[t, :], parameters)
         end
 
         update_filter_state!(filter.filter_state, y_t[t, :], M, H, R, Q, filter.n_particles)

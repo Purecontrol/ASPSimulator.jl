@@ -113,19 +113,21 @@ function plot!(t::TimeSeries{GaussianStateStochasticProcess}; label="")
 end
 
 
-function plot(t::TimeSeries{ParticleSwarmState}; label="")
-    mean_process = vcat([mean(t[i].particles_state, dims=2) for i in 1:t.n_t]...)
-    q_low = vcat([[quantile(t[i].particles_state[j, :], 0.025) for j in 1:t.n_state] for i in 1:t.n_t]...)
-    q_high = vcat([[quantile(t[i].particles_state[j, :], 0.975) for j in 1:t.n_state] for i in 1:t.n_t]...)
-    plot(q_low, fillrange = q_high, alpha=0.3, label="IC 95 % $label")
-    plot!(mean_process, label="Mean $label")
+function plot(t::TimeSeries{ParticleSwarmState}; label="", index = 1:t.n_state)
+    mean_process = hcat([mean(t[i].particles_state, dims=2) for i in 1:t.n_t]...)'
+    q_low = hcat([[quantile(t[i].particles_state[j, :], 0.025) for j in 1:t.n_state] for i in 1:t.n_t]...)'
+    q_high = hcat([[quantile(t[i].particles_state[j, :], 0.975) for j in 1:t.n_state] for i in 1:t.n_t]...)'
+    
+    plot(q_low[:, index], fillrange = q_high[:, index], alpha=0.3, label = hcat("IC 95 % ".*label...))
+    plot!(mean_process[:, index], label = hcat("Mean ".*label...))
 end
 
 
 function plot!(t::TimeSeries{ParticleSwarmState}; label="")
-    mean_process = vcat([mean(t[i].particles_state, dims=2) for i in 1:t.n_t]...)
-    q_low = vcat([[quantile(t[i].particles_state[j, :], 0.025) for j in 1:t.n_state] for i in 1:t.n_t]...)
-    q_high = vcat([[quantile(t[i].particles_state[j, :], 0.975) for j in 1:t.n_state] for i in 1:t.n_t]...)
-    plot!(q_low, fillrange = q_high, alpha=0.3, label="IC 95 % $label")
-    plot!(mean_process, label="Mean $label")
+    mean_process = hcat([mean(t[i].particles_state, dims=2) for i in 1:t.n_t]...)'
+    q_low = hcat([[quantile(t[i].particles_state[j, :], 0.025) for j in 1:t.n_state] for i in 1:t.n_t]...)'
+    q_high = hcat([[quantile(t[i].particles_state[j, :], 0.975) for j in 1:t.n_state] for i in 1:t.n_t]...)'
+    
+    plot!(q_low[:, index], fillrange = q_high[:, index], alpha=0.3, label = hcat("IC 95 % ".*label...))
+    plot!(mean_process[:, index], label = hcat("Mean ".*label...))
 end

@@ -14,20 +14,20 @@ include("smoothers/kalman_smoother.jl")
 include("smoothers/ensemble_kalman_smoother.jl")
 include("fit.jl")
 
-function A_t(exogenous, params, t)
+function A_t(exogenous, params)
 
     # Get Q_in and V
     Q_in = exogenous[1]
     V = params[1]
 
     # Define A
-    A = hcat([[1 - Q_in(t)/params[1]*(1/1440)]]...)
+    A = hcat([[1 - Q_in/params[1]*(1/1440)]]...)
 
     return A
 
 end
 
-function B_t(exogenous, params, t)
+function B_t(exogenous, params)
 
     # β
     β = params[2]
@@ -39,9 +39,9 @@ function B_t(exogenous, params, t)
 
 end
 
-H_t(exogenous, params, t) = Matrix{Float64}(I, 1, 1)
+H_t(exogenous, params) = Matrix{Float64}(I, 1, 1)
 
-function R_t(exogenous, params, t)
+function R_t(exogenous, params)
 
     # Get params
     η = exp(params[3])
@@ -53,7 +53,7 @@ function R_t(exogenous, params, t)
 
 end
 
-function Q_t(exogenous, params, t)
+function Q_t(exogenous, params)
 
     # Get params
     ϵ = exp(params[4])
@@ -65,7 +65,7 @@ function Q_t(exogenous, params, t)
 
 end
 
-function c_t(exogenous, params, t)
+function c_t(exogenous, params)
 
     # Get Q_in, X_in and β
     Q_in = exogenous[1]
@@ -73,13 +73,13 @@ function c_t(exogenous, params, t)
     V = params[1]
 
     # Define B
-    c = [(X_in(t)*Q_in(t))/V*(1/1440)]
+    c = [(X_in*Q_in)/V*(1/1440)]
 
     return c
 
 end
 
-function d_t(exogenous, params, t)
+function d_t(exogenous, params)
 
     # Define d
     d = zeros(1)
@@ -106,7 +106,10 @@ Q_in = sim.params_vec[5]
 function X_in(t)
     return sim.params_vec[4][10]
 end
-exogenous_variables = [Q_in, X_in]
+
+Q_in_t = [Q_in(model.current_state.t + (t-1)*glss.dt) for t in 1:size(y_train, 2)]
+X_in_t = [X_in(model.current_state.t + (t-1)*glss.dt) for t in 1:size(y_train, 2)]
+exogenous_variables = hcat([Q_in_t, X_in_t]...)
 
 # Optimize model with numerical maximization of likelihood
 y_t = transpose(y_train)
@@ -115,8 +118,6 @@ opt_params_nmle = sol.minimizer
 
 # Optimize model with EM
 @timed optim_params_em = EM(model, y_t, exogenous_variables, U_train)
-
-@timed optim_params_em = speed_EM(model, y_t, exogenous_variables, U_train)
 
 # Optimize model with EnKS EM
 optim_params_enks_em = EM_EnKS(model, y_t, exogenous_variables, U_train; n_particles = 300)
@@ -168,16 +169,17 @@ scatter!(y_t, markersize=0.5, label = "Observations")
 # PF -> AT, BS CPF -> AT or AS, BS
 
 
-function sample_discrete(prob, n_particules)
+function sample_discrete(prob, n_particules; n_exp = 1)
 
     # this speedup is due to Peter Acklam
-    cumprob = cumsum(prob)
-    N = size(cumprob, 1)
-    R = rand(n_particules)
+    cumprob = cumsum(prob, dims=1)
 
-    ind = ones(Int64, (n_particules))
+    N = size(cumprob, 1)
+    R = rand(n_exp, n_particules)
+
+    ind = ones(Int64, (n_exp, n_particules))
     for i = 1:N-1
-        ind .+= R .> cumprob[i]
+        ind .+= R .> cumprob[i, :]
     end
     ind
 
@@ -221,7 +223,7 @@ function PF_BS(sampling_weight, predicted_particles_swarm, predicted_particles_s
     
     ind_smoothing = sample_discrete((1/n_filtering).*ones(n_filtering), n_smoothing)
 
-    Xs[end, :, :] .= predicted_particles_swarm[end].particles_state[:, ind_smoothing]
+    Xs[end, :, :] .= predicted_particles_swarm[end].particles_state[:, ind_smoothing']
     smoothed_particles_swarm[end].particles_state = Xs[end, :, :]
 
     @inbounds for t in (n_obs):-1:1
@@ -231,12 +233,13 @@ function PF_BS(sampling_weight, predicted_particles_swarm, predicted_particles_s
         # Get current t_step
         t_step = init_state.t + (t-1)*glss.dt
 
-        σ = Matrix(glss.R_t(exogenous_variables, parameters, t_step))
+        σ = Matrix(glss.R_t(exogenous_variables[t, :], parameters))
 
         C = ((2*pi)^(-n_X/2))*(det(σ)^(-1/2))
-        for i in 1:n_smoothing
+        @inbounds for i in 1:n_smoothing
 
             v = Xs[t+1, :, i] .- predicted_particles_swarm_mean[t+1, :, :]
+
             smoothing_weight = dropdims(C.*exp.(-(1/2)*v'*pinv(σ).*v').*sampling_weight[t+1, :], dims=2) # sampling_weight[t, :] or sampling_weight[t+1, :]
 
             smoothing_weight ./= sum(smoothing_weight) 
@@ -254,6 +257,59 @@ function PF_BS(sampling_weight, predicted_particles_swarm, predicted_particles_s
     return smoothed_particles_swarm
 
 end
+
+
+function PF_BS2(sampling_weight, predicted_particles_swarm, predicted_particles_swarm_mean, n_smoothing, n_filtering, parameters)
+
+    t_index = [model.current_state.t + (model.system.dt)*(t-1) for t in 1:(n_obs+1)]
+    smoothed_particles_swarm = TimeSeries{ParticleSwarmState}(n_obs+1, 1, t_index; n_particles=n_smoothing)
+
+    Xs = zeros(Float64, n_obs+1, n_X, n_smoothing)
+    
+    ind_smoothing = sample_discrete((1/n_filtering).*ones(n_filtering), n_smoothing)
+
+    Xs[end, :, :] .= predicted_particles_swarm[end].particles_state[:, ind_smoothing']
+    smoothed_particles_swarm[end].particles_state = Xs[end, :, :]
+
+    @inbounds for t in (n_obs):-1:1
+
+        # Get current t_step
+        t_step = init_state.t + (t-1)*glss.dt
+
+        σ = pinv(Matrix(glss.R_t(exogenous_variables[t, :], parameters)))
+
+        v = Xs[t+1, :, :, [CartesianIndex()]] .- predicted_particles_swarm_mean[t+1, :, [CartesianIndex()], :]
+
+        # To adapt if n_X > 1
+        smoothing_weights = exp.((-1/2)*v[1, :, :]*σ[1, 1].*v[1, :, :]).*sampling_weight[t+1, [CartesianIndex()], :]
+        
+        smoothing_weights ./= sum(smoothing_weights, dims=2) 
+
+        ind_smoothing = sample_discrete(smoothing_weights', 1, n_exp=n_smoothing)
+
+        Xs[t, :, :] .= predicted_particles_swarm[t].particles_state[:, ind_smoothing]
+
+        smoothed_particles_swarm[t].particles_state = Xs[t, :, :]
+
+    end
+
+    return smoothed_particles_swarm
+
+end
+
+
+n_smoothing = 1000
+@timed smoother_output_pf_bs2 = PF_BS2(filter_output_pf.sampling_weights, filter_output_pf.predicted_particles_swarm, filter_output_pf.predicted_particles_swarm_mean, n_smoothing, n_particles, model.parameters)
+@timed smoother_output_pf_bs = PF_BS(filter_output_pf.sampling_weights, filter_output_pf.predicted_particles_swarm, filter_output_pf.predicted_particles_swarm_mean, n_smoothing, n_particles, model.parameters)
+
+
+plot(smoother_output_pf_bs2, label="PF-BS2")
+# plot!(smoother_output_pf_bs, label="PF-BS")
+plot!((H*x_train)', label="real")
+plot!(smoother_output.smoothed_state, label="KF")
+plot!(title="Smoothing")
+
+
 
 
 function SEM(model::ForecastingModel{GaussianLinearStateSpaceSystem}, y_t, exogenous_variables, control_variables; n_particles=30)
@@ -274,11 +330,11 @@ function SEM(model::ForecastingModel{GaussianLinearStateSpaceSystem}, y_t, exoge
 
             ivar_obs = findall(.!isnan.(y_t[t, :]))
 
-            R_i = model.system.R_t(exogenous_variables, parameters, t_step)
-            Q_i = model.system.Q_t(exogenous_variables, parameters, t_step)
+            R_i = model.system.R_t(exogenous_variables[t, :], parameters)
+            Q_i = model.system.Q_t(exogenous_variables[t, :], parameters)
 
-            M_i = transition(model.system, smoothed_values[t].particles_state, exogenous_variables, control_variables[t, :], parameters, t_step)
-            H_i = observation(model.system, smoothed_values[t].particles_state, exogenous_variables, parameters, t_step)[ivar_obs, :]
+            M_i = transition(model.system, smoothed_values[t].particles_state, exogenous_variables[t, :], control_variables[t, :], parameters)
+            H_i = observation(model.system, smoothed_values[t].particles_state, exogenous_variables[t, :], parameters)[ivar_obs, :]
 
             ϵ_i = y_t[t, ivar_obs] .- H_i
             Σ = (ϵ_i*ϵ_i') ./ (n_particles - 1)
@@ -309,7 +365,7 @@ function SEM(model::ForecastingModel{GaussianLinearStateSpaceSystem}, y_t, exoge
         push!(llk_array, filter_output.llk / n_obs)
         println("Iter n° $(i-1) | Log Likelihood : ", llk_array[end])
 
-        smoothed_particles_swarm = PF_BS(filter_output.sampling_weights, filter_output.predicted_particles_swarm, filter_output.predicted_particles_swarm_mean, n_particles, n_particles, parameters)
+        smoothed_particles_swarm = PF_BS2(filter_output.sampling_weights, filter_output.predicted_particles_swarm, filter_output.predicted_particles_swarm_mean, n_particles, n_particles, parameters)
 
         prob = Optimization.OptimizationProblem(optprob, parameters, smoothed_particles_swarm)
         sol = solve(prob, Optim.Newton(), maxiters = 20)
@@ -328,7 +384,7 @@ end
 
 
 model.parameters = [1333.0, 200.0, -2.30, -2.30]
-test = SEM(model, y_t, exogenous_variables, U_train; n_particles = 300)
+optim_params_pfbs_sem = SEM(model, y_t, exogenous_variables, U_train; n_particles = 200)
 
 
 
@@ -357,11 +413,15 @@ plot!(title="Filtered values")
 
 n_smoothing = 200
 smoother_output = smoother(model, y_t, exogenous_variables, U_train, filter_output)
-smoother_output_pf = PF_BS(filter_output_pf.sampling_weights, filter_output_pf.predicted_particles_swarm, filter_output_pf.predicted_particles_swarm_mean, n_smoothing, n_particles, model.parameters)
+smoother_output_pf_bs = PF_BS(filter_output_pf.sampling_weights, filter_output_pf.predicted_particles_swarm, filter_output_pf.predicted_particles_swarm_mean, n_smoothing, n_particles, model.parameters)
 smoother_output_enkf = smoother(model, y_t, exogenous_variables, U_train, filter_output_enkf; smoother_method=EnsembleKalmanSmoother(model.system.n_X, model.system.n_Y, n_particles))
+smoother_output_pf_at = PF_AT(filter_output_pf.sampling_weights[end, :], filter_output_pf.predicted_particles_swarm, filter_output_pf.ancestor_indices, n_smoothing)
 
 # Smoothed values
 plot(smoother_output_enkf.smoothed_state, label="EnKF")
-plot!(smoother_output_pf, label="PF-BS")
+plot!(smoother_output_pf_at, label="PF-AT")
+plot!(smoother_output_pf_bs, label="PF-BS")
 plot!(smoother_output.smoothed_state, label="KF")
 plot!(title="Smoothing")
+
+

@@ -70,7 +70,7 @@ mutable struct ParticleFilterOutput <: FilterOutput
 
         sampling_weights = ones(Float64, n_obs+1, n_particles)
         ancestor_indices = zeros(Int64, n_obs, n_particles)
-        predicted_particles_swarm_mean = zeros(Float64, n_obs+1, n_X, n_particles)
+        predicted_particles_swarm_mean = zeros(Float64, n_obs+1, model.system.n_X, n_particles)
 
 
         return new(predicted_particles_swarm, filtered_particles_swarm, observed_particles_swarm, sampling_weights, ancestor_indices, predicted_particles_swarm_mean, 0.0)
@@ -108,19 +108,21 @@ function filter!(filter_output::ParticleFilterOutput, sys::StateSpaceSystem, fil
 
     @inbounds for t in 1:n_obs
 
-        # Get current t_step
-        t_step = filter.init_state_x.t + (t-1)*sys.dt
+        # println("Step $t")
 
-        R = sys.R_t(exogenous_variables, parameters, t_step)
-        Q = sys.Q_t(exogenous_variables, parameters, t_step)
+        # Get current t_step
+        # t_step = filter.init_state_x.t + (t-1)*sys.dt
+
+        R = sys.R_t(exogenous_variables[t, :], parameters)
+        Q = sys.Q_t(exogenous_variables[t, :], parameters)
 
         # Define actual transition and observation operators
         function M(x)
-            return transition(sys, x, exogenous_variables, control_variables[t, :], parameters, t_step)
+            return transition(sys, x, exogenous_variables[t, :], control_variables[t, :], parameters)
         end
 
         function H(x)
-            return observation(sys, x, exogenous_variables, parameters, t_step)
+            return observation(sys, x, exogenous_variables[t, :], parameters)
         end
 
         ################################################################################
@@ -160,7 +162,7 @@ function filter!(filter_output::ParticleFilterOutput, sys::StateSpaceSystem, fil
 
         # Filtered state
         filtered_state_mean[t, :] = vec(sum(filter_state.predicted_particles_swarm .* filter_state.sampling_weight', dims = 2))
-        filtered_state_var[t, :, :] = vec(sum(((filter_state.predicted_particles_swarm .- filtered_state_mean[t, :]).^2).* filter_state.sampling_weight', dims = 2))
+        filtered_state_var[t, :, :] = ((filter_state.predicted_particles_swarm .- filtered_state_mean[t, :]).*(filter_state.sampling_weight')*transpose(filter_state.predicted_particles_swarm .- filtered_state_mean[t, :]))
 
         #### Resampling STEP ####
 

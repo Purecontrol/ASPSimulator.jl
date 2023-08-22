@@ -55,7 +55,7 @@ function get_smoother_output(smoother::EnsembleKalmanSmoother, model, y_t)
 end
 
 
-function smoother!(smoother_output::EnsembleKalmanSmootherOutput, filter_output::EnsembleKalmanFilterOutput, sys::GaussianLinearStateSpaceSystem, smoother::EnsembleKalmanSmoother, y_t, exogenous_variables, control_variables, parameters)
+function smoother!(smoother_output::EnsembleKalmanSmootherOutput, filter_output::EnsembleKalmanFilterOutput, sys::StateSpaceSystem, smoother::EnsembleKalmanSmoother, y_t, exogenous_variables, control_variables, parameters)
 
     n_obs = size(y_t, 1)
 
@@ -84,7 +84,7 @@ end
 function update_smoother_state!(smoother_state, Xp, Xf)
 
     Paf = cov(Xf, Xp, dims=2)
-    Pff = var(Xp, dims=2)
+    Pff = cov(Xp, Xp, dims=2)
     K = Paf*inv(Pff)
 
     smoother_state.smoothed_particles_swarm = Xf + K*(smoother_state.smoothed_particles_swarm - Xp)

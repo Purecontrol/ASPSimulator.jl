@@ -107,13 +107,13 @@ function filter!(filter_output::KalmanFilterOutput, sys::GaussianLinearStateSpac
         t_step = filter.init_state_x.t + (t-1)*sys.dt
 
         # Get current matrix A, B, H and Q
-        A = sys.A_t(exogenous_variables, parameters, t_step)
-        B = sys.B_t(exogenous_variables, parameters, t_step)
-        c = sys.c_t(exogenous_variables, parameters, t_step)
-        H = sys.H_t(exogenous_variables, parameters, t_step)
-        d = sys.d_t(exogenous_variables, parameters, t_step)
-        R = sys.R_t(exogenous_variables, parameters, t_step)
-        Q = sys.Q_t(exogenous_variables, parameters, t_step)
+        A = sys.A_t(exogenous_variables[t, :], parameters)
+        B = sys.B_t(exogenous_variables[t, :], parameters)
+        c = sys.c_t(exogenous_variables[t, :], parameters)
+        H = sys.H_t(exogenous_variables[t, :], parameters)
+        d = sys.d_t(exogenous_variables[t, :], parameters)
+        R = sys.R_t(exogenous_variables[t, :], parameters)
+        Q = sys.Q_t(exogenous_variables[t, :], parameters)
 
         update_filter_state!(filter.filter_state, y_t[t, :], control_variables[t, :], A, B, c, H, d, R, Q)
 
@@ -137,13 +137,13 @@ function filter!(sys::GaussianLinearStateSpaceSystem, filter::KalmanFilter, y_t,
         t_step = filter.init_state_x.t + (t-1)*sys.dt
 
         # Get current matrix A, B, H and Q
-        A = sys.A_t(exogenous_variables, parameters, t_step)
-        B = sys.B_t(exogenous_variables, parameters, t_step)
-        c = sys.c_t(exogenous_variables, parameters, t_step)
-        H = sys.H_t(exogenous_variables, parameters, t_step)
-        d = sys.d_t(exogenous_variables, parameters, t_step)
-        R = sys.R_t(exogenous_variables, parameters, t_step)
-        Q = sys.Q_t(exogenous_variables, parameters, t_step)
+        A = sys.A_t(exogenous_variables[t, :], parameters)
+        B = sys.B_t(exogenous_variables[t, :], parameters)
+        c = sys.c_t(exogenous_variables[t, :], parameters)
+        H = sys.H_t(exogenous_variables[t, :], parameters)
+        d = sys.d_t(exogenous_variables[t, :], parameters)
+        R = sys.R_t(exogenous_variables[t, :], parameters)
+        Q = sys.Q_t(exogenous_variables[t, :], parameters)
 
         update_filter_state!(filter.filter_state, y_t[t, :], control_variables[t, :], A, B, c, H, d, R, Q)
 
