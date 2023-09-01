@@ -150,7 +150,7 @@ function EM_EnKS(model::ForecastingModel, y_t, exogenous_variables, control_vari
 
     llk_array = []
     parameters = model.parameters
-    for i in 1:50
+    for i in 1:10
         
         filter_output = filter(model, y_t, exogenous_variables, control_variables; parameters=parameters, filter=EnsembleKalmanFilter(model.current_state, model.system.n_X, model.system.n_Y, n_particles))
 
@@ -160,9 +160,9 @@ function EM_EnKS(model::ForecastingModel, y_t, exogenous_variables, control_vari
         smoother_ouput = smoother(model, y_t, exogenous_variables, control_variables, filter_output; parameters=parameters, smoother_method=EnsembleKalmanSmoother(model.system.n_X, model.system.n_Y, n_particles))
 
         prob = Optimization.OptimizationProblem(optprob, parameters, smoother_ouput)
-        sol = solve(prob, Optim.LBFGS(), maxiters = 1, show_trace=true, show_every=1)
+        sol = solve(prob, NLopt.LD_LBFGS(), maxiters = 1) #, show_trace=true, show_every=1)
         parameters = sol.minimizer
-        print(sol.minimizer)
+        # print(sol.minimizer)
     
     end
 

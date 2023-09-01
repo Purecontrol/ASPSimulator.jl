@@ -1,4 +1,5 @@
 using Statistics
+using StaticArrays
 
 """
 Return the differential equations for the simplified ASM1 model.
@@ -14,43 +15,223 @@ Return the differential equations for the simplified ASM1 model.
 - `p[8]::Float64` : KLa
 
 """
+# function simplified_asm1!(dX, X, p, t)
+
+#     ### Retrieve parameters ###
+#     # Kinetic parameters
+#     K_DCO, K_OH, K_NO, η_g, η_h, K_ND, K_NH, K_OA = p[1]
+#      #     K_DCO = p[1][1] ; K_OH = p[1][2] ; K_NO = p[1][3] ; η_g = p[1][4] ; η_h = p[1][5] ; K_ND = p[1][6]; K_NH = p[1][7] ; K_OA =  p[1][8]
+#     #Additional parameters
+#     θ_1, θ_2, θ_3, θ_4, θ_5 = p[2]
+#      #     θ_1 = p[2][1] ; θ_2 = p[2][2] ; θ_3 = p[2][3] ; θ_4 = p[2][4] ; θ_5 = p[2][5]
+#     # Matrice with stoichiometric parameters
+#     R = p[3]
+#     # Other parameters 
+#     volume = p[4] ; X_in = p[5] ; Q_in = p[6] ; SO_sat = p[7] ; KLa = p[8]
+
+#     # If Q_in is a function of the time t, then evaluate it
+#      #     if typeof(Q_in) <: Function
+#      #          Q_in = Q_in(t)
+#      #     end
+
+#     # If X_in is a function of the time t, then evaluate it
+#      #     if typeof(X_in) <: Function
+#      #          X_in = X_in(t)
+#      #     end
+
+#     ### Calculate process rates ###
+#     saturation_oxy_1 = (X[2]/(K_OH+X[2]))
+#     saturation_dco = (X[1]/(K_DCO+X[1]))
+#     saturation_no = (X[3]/(K_NO+X[3]))
+#     saturation_oxy2_no = saturation_no*K_OH/(K_OH+X[2])
+#     process_rates = [θ_1*saturation_dco*saturation_oxy_1, # Aerobic growth of heterotrophs
+#     θ_1*η_g*saturation_dco*saturation_oxy2_no, # Anoxic growth of heterotrophs
+#     θ_3*(X[4]/(K_NH+X[4]))*(X[2]/(K_OA+X[2])), # Aerobic growth of autotrophs
+#     θ_2, # "Decay" of heterotrophs and autotrophs
+#     θ_4*X[5], # Ammonification of soluble organic nitrogen
+#     θ_5*((X[1])/(K_ND+X[1]))*(saturation_oxy_1+η_h*saturation_oxy2_no)] # "Hydrolysis" of entrapped organics nitrogen
+#      #     process_rates = [θ_1*(X[1]/(K_DCO+X[1]))*(X[2]/(K_OH+X[2])), # Aerobic growth of heterotrophs
+#      #     θ_1*η_g*(X[1]/(K_DCO+X[1]))*(K_OH/(K_OH+X[2]))*(X[3]/(K_NO+X[3])), # Anoxic growth of heterotrophs
+#      #     θ_3*(X[4]/(K_NH+X[4]))*(X[2]/(K_OA+X[2])), # Aerobic growth of autotrophs
+#      #     θ_2, # "Decay" of heterotrophs and autotrophs
+#      #     θ_4*X[5], # Ammonification of soluble organic nitrogen
+#      #     θ_5*((X[1])/(K_ND+X[1]))*((X[2]/(K_OH+X[2]))+η_h*(K_OH/(K_OH+X[2]))*(X[3]/(K_NO+X[3])))] # "Hydrolysis" of entrapped organics nitrogen
+
+#     ### Calculate differential equations ###
+#     # General expression
+#     dX[1:5] = (Q_in/volume) .* (X_in - X[1:5]) + R * process_rates
+#     dX[6] = 0.0
+
+#     # Control input for oxygen
+#     dX[2] += X[6] * KLa * (SO_sat - X[2])
+
+# end
+
 function simplified_asm1!(dX, X, p, t)
 
-    ### Retrieve parameters ###
-    # Kinetic parameters
-    K_DCO = p[1][1] ; K_OH = p[1][2] ; K_NO = p[1][3] ; η_g = p[1][4] ; η_h = p[1][5] ; K_ND = p[1][6]; K_NH = p[1][7] ; K_OA =  p[1][8]
-    #Additional parameters
-    θ_1 = p[2][1] ; θ_2 = p[2][2] ; θ_3 = p[2][3] ; θ_4 = p[2][4] ; θ_5 = p[2][5]
-    # Matrice with stoichiometric parameters
-    R = p[3]
-    # Other parameters 
-    volume = p[4] ; X_in = p[5] ; Q_in = p[6] ; SO_sat = p[7] ; KLa = p[8]
+     Y_A = p[14] ; Y_H = p[15] ; i_XB = p[16]
+     R = @SMatrix[ -1/Y_H          -1/Y_H                 0                  1      0     0;
+                   -(1-Y_H)/Y_H    0                      -4.57/Y_A+1        0      0     0;
+                   0               -(1-Y_H)/(2.86*Y_H)    1.0/Y_A            0      0     0;
+                   -i_XB           -i_XB                  -(i_XB+(1.0/Y_A))  0      1     0;
+                   0               0                      0                  0     -1     1]
+ 
+     ### Calculate process rates ###
+     K_OH = p[2]
+     saturation_oxy_1 = (X[2]/(K_OH+X[2]))
+     saturation_dco = p[9]*(X[1]/(p[1]+X[1]))
+     saturation_no = (X[3]/(p[3]+X[3]))
+     saturation_oxy2_no = saturation_no*K_OH/(K_OH+X[2])
+     process_rates = @SArray [saturation_dco*saturation_oxy_1,
+                              p[4]*saturation_dco*saturation_oxy2_no, 
+                              p[11]*(X[4]/(p[7]+X[4]))*(X[2]/(p[8]+X[2])), 
+                              p[10], 
+                              p[12]*X[5], 
+                              p[13]*((X[1])/(p[6]+X[1]))*(saturation_oxy_1+p[5]*saturation_oxy2_no)]
+     
+     ### Calculate differential equations ###
+     dX[1:5] = (p[23]/p[17]) .* (p[18:22] - X[1:5]) + R * process_rates
+     dX[6] = 0.0
+     dX[2] += X[6] * p[25] * (p[24] - X[2])
 
-    # If Q_in is a function of the time t, then evaluate it
-    if typeof(Q_in) <: Function
-         Q_in = Q_in(t)
-    end
+end
 
-    # If X_in is a function of the time t, then evaluate it
-    if typeof(X_in) <: Function
-         X_in = X_in(t)
-    end
 
-    ### Calculate process rates ###
-    process_rates = [θ_1*(X[1]/(K_DCO+X[1]))*(X[2]/(K_OH+X[2])), # Aerobic growth of heterotrophs
-    θ_1*η_g*(X[1]/(K_DCO+X[1]))*(K_OH/(K_OH+X[2]))*(X[3]/(K_NO+X[3])), # Anoxic growth of heterotrophs
-    θ_3*(X[4]/(K_NH+X[4]))*(X[2]/(K_OA+X[2])), # Aerobic growth of autotrophs
-    θ_2, # "Decay" of heterotrophs and autotrophs
-    θ_4*X[5], # Ammonification of soluble organic nitrogen
-    θ_5*((X[1])/(K_ND+X[1]))*((X[2]/(K_OH+X[2]))+η_h*(K_OH/(K_OH+X[2]))*(X[3]/(K_NO+X[3])))] # "Hydrolysis" of entrapped organics nitrogen
 
-    ### Calculate differential equations ###
-    # General expression
-    dX[1:5] .= (Q_in/volume) * (X_in .- X[1:5]) .+ R * process_rates
-    dX[6] = 0.0
+function simplified_asm1_old!(dX, X, p, t)
 
-    # Control input for oxygen
-    dX[2] += X[6] * KLa * (SO_sat - X[2])
+     ### Retrieve parameters ###
+     # Kinetic parameters
+     # K_DCO, K_OH, K_NO, η_g, η_h, K_ND, K_NH, K_OA = p[1]
+      #     K_DCO = p[1][1] ; K_OH = p[1][2] ; K_NO = p[1][3] ; η_g = p[1][4] ; η_h = p[1][5] ; K_ND = p[1][6]; K_NH = p[1][7] ; K_OA =  p[1][8]
+     #Additional parameters
+     # θ_1, θ_2, θ_3, θ_4, θ_5 = p[2]
+     #     θ_1 = p[2][1] ; θ_2 = p[2][2] ; θ_3 = p[2][3] ; θ_4 = p[2][4] ; θ_5 = p[2][5]
+     # Matrice with stoichiometric parameters
+     # R = p[3]
+     # Other parameters 
+     # volume = p[4] ; X_in = p[5] ; Q_in = p[6] ; SO_sat = p[7] ; KLa = p[8]
+ 
+     # If Q_in is a function of the time t, then evaluate it
+     # if typeof(p[6]) <: Function
+     #      Q_in = Q_in(t)
+     # end
+ 
+     # # If X_in is a function of the time t, then evaluate it
+     # if typeof(p[5]) <: Function
+     #      X_in = X_in(t)
+     # end
+
+ 
+     ### Calculate process rates ###
+     K_OH = p[2]
+     saturation_oxy_1 = (X[2]/(K_OH+X[2]))
+     saturation_dco = p[9]*(X[1]/(p[1]+X[1]))
+     saturation_no = (X[3]/(p[3]+X[3]))
+     saturation_oxy2_no = saturation_no*K_OH/(K_OH+X[2])
+     process_rates = @SArray [saturation_dco*saturation_oxy_1, # Aerobic growth of heterotrophs
+     p[4]*saturation_dco*saturation_oxy2_no, # Anoxic growth of heterotrophs
+     p[11]*(X[4]/(p[7]+X[4]))*(X[2]/(p[8]+X[2])), # Aerobic growth of autotrophs
+     p[10], # "Decay" of heterotrophs and autotrophs
+     p[12]*X[5], # Ammonification of soluble organic nitrogen
+     p[13]*((X[1])/(p[6]+X[1]))*(saturation_oxy_1+p[5]*saturation_oxy2_no)] # "Hydrolysis" of entrapped organics nitrogen
+     #     process_rates = [θ_1*(X[1]/(K_DCO+X[1]))*(X[2]/(K_OH+X[2])), # Aerobic growth of heterotrophs
+     #     θ_1*η_g*(X[1]/(K_DCO+X[1]))*(K_OH/(K_OH+X[2]))*(X[3]/(K_NO+X[3])), # Anoxic growth of heterotrophs
+     #     θ_3*(X[4]/(K_NH+X[4]))*(X[2]/(K_OA+X[2])), # Aerobic growth of autotrophs
+     #     θ_2, # "Decay" of heterotrophs and autotrophs
+     #     θ_4*X[5], # Ammonification of soluble organic nitrogen
+     #     θ_5*((X[1])/(K_ND+X[1]))*((X[2]/(K_OH+X[2]))+η_h*(K_OH/(K_OH+X[2]))*(X[3]/(K_NO+X[3])))] # "Hydrolysis" of entrapped organics nitrogen
+     
+     ### Calculate differential equations ###
+     # General expression
+     dX[1:5] = (p[17]/p[15]) .* (p[16] - X[1:5]) + p[14] * process_rates
+     # dX[1:5] = (Q_in/volume) .* (X_in - X[1:5]) + R * process_rates
+     dX[6] = 0.0
+
+     # # Control input for oxygen
+     dX[2] += X[6] * p[19] * (p[18] - X[2])
+     # dX[2] += X[6] * KLa * (SO_sat - X[2])
+     # Y_A, Y_H, i_XB = p[3]
+     # ratio = (p[6]/p[4])
+
+     # dX = @SArray[ratio*(p[5][1] - X[1]) - (1/Y_H)*(θ_1*saturation_dco*saturation_oxy_1 + θ_1*η_g*saturation_dco*saturation_oxy2_no) + θ_2,
+     #      ratio*(p[5][2] - X[2]) - ((1 - Y_H)/Y_H)*θ_1*saturation_dco*saturation_oxy_1 + (1-(4.57/Y_A))*θ_3*(X[4]/(K_NH+X[4]))*(X[2]/(K_OA+X[2])) + X[6] * KLa * (SO_sat - X[2]),
+     #      ratio*(p[5][3] - X[3]) - (1-Y_H)/(2.86*Y_H)*θ_1*η_g*saturation_dco*saturation_oxy2_no + (1/Y_A)*θ_3*(X[4]/(K_NH+X[4]))*(X[2]/(K_OA+X[2])),
+     #      ratio*(p[5][4] - X[4]) - i_XB*(θ_1*saturation_dco*saturation_oxy_1 + θ_1*η_g*saturation_dco*saturation_oxy2_no) - (i_XB + 1/Y_A)*θ_3*(X[4]/(K_NH+X[4]))*(X[2]/(K_OA+X[2])) + θ_4*X[5],
+     #      ratio*(p[5][5] - X[5]) - θ_4*X[5] + θ_5*((X[1])/(K_ND+X[1]))*(saturation_oxy_1+η_h*saturation_oxy2_no),
+     #      0.0]
+
+end
+
+
+
+function simplified_asm1_past!(dX, X, p, t)
+
+     ### Retrieve parameters ###
+     # Kinetic parameters
+     # K_DCO, K_OH, K_NO, η_g, η_h, K_ND, K_NH, K_OA = p[1]
+      #     K_DCO = p[1][1] ; K_OH = p[1][2] ; K_NO = p[1][3] ; η_g = p[1][4] ; η_h = p[1][5] ; K_ND = p[1][6]; K_NH = p[1][7] ; K_OA =  p[1][8]
+     #Additional parameters
+     # θ_1, θ_2, θ_3, θ_4, θ_5 = p[2]
+     #     θ_1 = p[2][1] ; θ_2 = p[2][2] ; θ_3 = p[2][3] ; θ_4 = p[2][4] ; θ_5 = p[2][5]
+     # Matrice with stoichiometric parameters
+     # R = p[3]
+     # Other parameters 
+     # volume = p[4] ; X_in = p[5] ; Q_in = p[6] ; SO_sat = p[7] ; KLa = p[8]
+ 
+     # If Q_in is a function of the time t, then evaluate it
+     # if typeof(p[6]) <: Function
+     #      Q_in = Q_in(t)
+     # end
+ 
+     # # If X_in is a function of the time t, then evaluate it
+     # if typeof(p[5]) <: Function
+     #      X_in = X_in(t)
+     # end
+     Y_A, Y_H, i_XB = p[3]
+     R = @SMatrix[ -1/Y_H         -1/Y_H                 0                       1      0     0;
+     -(1-Y_H)/Y_H   0                      -4.57/Y_A+1         0      0     0;
+     0              -(1-Y_H)/(2.86*Y_H)     1.0/Y_A            0      0     0;
+     -i_XB          -i_XB                  -(i_XB+(1.0/Y_A))   0      1     0;
+     0              0                      0                   0     -1     1]
+ 
+     ### Calculate process rates ###
+     K_OH = p[1][2]
+     saturation_oxy_1 = (X[2]/(K_OH+X[2]))
+     saturation_dco = p[2][1]*(X[1]/(p[1][1]+X[1]))
+     saturation_no = (X[3]/(p[1][3]+X[3]))
+     saturation_oxy2_no = saturation_no*K_OH/(K_OH+X[2])
+     process_rates = @SArray [saturation_dco*saturation_oxy_1, # Aerobic growth of heterotrophs
+     p[1][4]*saturation_dco*saturation_oxy2_no, # Anoxic growth of heterotrophs
+     p[2][3]*(X[4]/(p[1][7]+X[4]))*(X[2]/(p[1][8]+X[2])), # Aerobic growth of autotrophs
+     p[2][2], # "Decay" of heterotrophs and autotrophs
+     p[2][4]*X[5], # Ammonification of soluble organic nitrogen
+     p[2][5]*((X[1])/(p[1][6]+X[1]))*(saturation_oxy_1+p[1][5]*saturation_oxy2_no)] # "Hydrolysis" of entrapped organics nitrogen
+     #     process_rates = [θ_1*(X[1]/(K_DCO+X[1]))*(X[2]/(K_OH+X[2])), # Aerobic growth of heterotrophs
+     #     θ_1*η_g*(X[1]/(K_DCO+X[1]))*(K_OH/(K_OH+X[2]))*(X[3]/(K_NO+X[3])), # Anoxic growth of heterotrophs
+     #     θ_3*(X[4]/(K_NH+X[4]))*(X[2]/(K_OA+X[2])), # Aerobic growth of autotrophs
+     #     θ_2, # "Decay" of heterotrophs and autotrophs
+     #     θ_4*X[5], # Ammonification of soluble organic nitrogen
+     #     θ_5*((X[1])/(K_ND+X[1]))*((X[2]/(K_OH+X[2]))+η_h*(K_OH/(K_OH+X[2]))*(X[3]/(K_NO+X[3])))] # "Hydrolysis" of entrapped organics nitrogen
+     
+     ### Calculate differential equations ###
+     # General expression
+     dX[1:5] = (p[6]/p[4]) .* (p[5] - X[1:5]) + R * process_rates
+     # dX[1:5] = (Q_in/volume) .* (X_in - X[1:5]) + R * process_rates
+     dX[6] = 0.0
+
+     # # Control input for oxygen
+     dX[2] += X[6] * p[8] * (p[7] - X[2])
+     # dX[2] += X[6] * KLa * (SO_sat - X[2])
+     # Y_A, Y_H, i_XB = p[3]
+     # ratio = (p[6]/p[4])
+
+     # dX = @SArray[ratio*(p[5][1] - X[1]) - (1/Y_H)*(θ_1*saturation_dco*saturation_oxy_1 + θ_1*η_g*saturation_dco*saturation_oxy2_no) + θ_2,
+     #      ratio*(p[5][2] - X[2]) - ((1 - Y_H)/Y_H)*θ_1*saturation_dco*saturation_oxy_1 + (1-(4.57/Y_A))*θ_3*(X[4]/(K_NH+X[4]))*(X[2]/(K_OA+X[2])) + X[6] * KLa * (SO_sat - X[2]),
+     #      ratio*(p[5][3] - X[3]) - (1-Y_H)/(2.86*Y_H)*θ_1*η_g*saturation_dco*saturation_oxy2_no + (1/Y_A)*θ_3*(X[4]/(K_NH+X[4]))*(X[2]/(K_OA+X[2])),
+     #      ratio*(p[5][4] - X[4]) - i_XB*(θ_1*saturation_dco*saturation_oxy_1 + θ_1*η_g*saturation_dco*saturation_oxy2_no) - (i_XB + 1/Y_A)*θ_3*(X[4]/(K_NH+X[4]))*(X[2]/(K_OA+X[2])) + θ_4*X[5],
+     #      ratio*(p[5][5] - X[5]) - θ_4*X[5] + θ_5*((X[1])/(K_ND+X[1]))*(saturation_oxy_1+η_h*saturation_oxy2_no),
+     #      0.0]
 
 end
 
@@ -61,7 +242,7 @@ function get_stoichiometric_matrix_simplified_asm1(stoichiometric_parameters)
 
     Y_A = stoichiometric_parameters[1] ; Y_H = stoichiometric_parameters[2] ; i_XB = stoichiometric_parameters[3]
     
-    R = [ -1/Y_H         -1/Y_H                 0                       1      0     0;
+    R = @SMatrix[ -1/Y_H         -1/Y_H                 0                       1      0     0;
               -(1-Y_H)/Y_H   0                      -4.57/Y_A+1         0      0     0;
               0              -(1-Y_H)/(2.86*Y_H)     1.0/Y_A            0      0     0;
               -i_XB          -i_XB                  -(i_XB+(1.0/Y_A))   0      1     0;
@@ -107,7 +288,7 @@ function get_default_parameters_simplified_asm1(; T = 15, get_R::Bool=true, infl
      ### Stoichiometric parameters ###
      Y_A = 0.24 ; Y_H = 0.67 ; i_XB = 0.08
      if get_R
-          R = [ -1/Y_H         -1/Y_H                 0                       1      0     0;
+          R = @SMatrix[ -1/Y_H         -1/Y_H                 0                       1      0     0;
                     -(1-Y_H)/Y_H   0                      -4.57/Y_A+1         0      0     0;
                     0              -(1-Y_H)/(2.86*Y_H)     1.0/Y_A            0      0     0;
                     -i_XB          -i_XB                  -(i_XB+(1.0/Y_A))   0      1     0;
