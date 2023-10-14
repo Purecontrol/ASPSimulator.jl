@@ -67,36 +67,6 @@ Return the differential equations for the simplified ASM1 model.
 
 # end
 
-function simplified_asm1!(dX, X, p, t)
-
-     Y_A = p[14] ; Y_H = p[15] ; i_XB = p[16]
-     R = @SMatrix[ -1/Y_H          -1/Y_H                 0                  1      0     0;
-                   -(1-Y_H)/Y_H    0                      -4.57/Y_A+1        0      0     0;
-                   0               -(1-Y_H)/(2.86*Y_H)    1.0/Y_A            0      0     0;
-                   -i_XB           -i_XB                  -(i_XB+(1.0/Y_A))  0      1     0;
-                   0               0                      0                  0     -1     1]
- 
-     ### Calculate process rates ###
-     K_OH = p[2]
-     saturation_oxy_1 = (X[2]/(K_OH+X[2]))
-     saturation_dco = p[9]*(X[1]/(p[1]+X[1]))
-     saturation_no = (X[3]/(p[3]+X[3]))
-     saturation_oxy2_no = saturation_no*K_OH/(K_OH+X[2])
-     process_rates = @SArray [saturation_dco*saturation_oxy_1,
-                              p[4]*saturation_dco*saturation_oxy2_no, 
-                              p[11]*(X[4]/(p[7]+X[4]))*(X[2]/(p[8]+X[2])), 
-                              p[10], 
-                              p[12]*X[5], 
-                              p[13]*((X[1])/(p[6]+X[1]))*(saturation_oxy_1+p[5]*saturation_oxy2_no)]
-     
-     ### Calculate differential equations ###
-     dX[1:5] = (p[23]/p[17]) .* (p[18:22] - X[1:5]) + R * process_rates
-     dX[6] = 0.0
-     dX[2] += X[6] * p[25] * (p[24] - X[2])
-
-end
-
-
 
 function simplified_asm1_old!(dX, X, p, t)
 
@@ -235,27 +205,11 @@ function simplified_asm1_past!(dX, X, p, t)
 
 end
 
-"""
-Return the stoichiometric matrix of the simplified ASM1 model from the parameters given in stoichiometric_parameters.
-"""
-function get_stoichiometric_matrix_simplified_asm1(stoichiometric_parameters)
-
-    Y_A = stoichiometric_parameters[1] ; Y_H = stoichiometric_parameters[2] ; i_XB = stoichiometric_parameters[3]
-    
-    R = @SMatrix[ -1/Y_H         -1/Y_H                 0                       1      0     0;
-              -(1-Y_H)/Y_H   0                      -4.57/Y_A+1         0      0     0;
-              0              -(1-Y_H)/(2.86*Y_H)     1.0/Y_A            0      0     0;
-              -i_XB          -i_XB                  -(i_XB+(1.0/Y_A))   0      1     0;
-              0              0                      0                   0     -1     1]
-
-    return R
-
-end
 
 """
 Return the default parameters for the simplified ASM1 model.
 """
-function get_default_parameters_simplified_asm1(; T = 15, get_R::Bool=true, influent_file_path = nothing, fixed_concentration = nothing)
+function get_default_parameters_simplified_asm1_old(; T = 15, get_R::Bool=true, influent_file_path = nothing, fixed_concentration = nothing)
 
      ### Define the function that adapts the parameters according to the temperature ###
      function T_var(T, ρ, a)
@@ -308,8 +262,10 @@ function get_default_parameters_simplified_asm1(; T = 15, get_R::Bool=true, infl
 
      if influent_file_path ≠ nothing
           inflow_generator = readdlm(influent_file_path)
+          itp = interpolate((inflow_generator[: ,1], ), inflow_generator[: ,10], Gridded(Linear()))
+          T_max = maximum(inflow_generator[: ,1])
           function Q_in(t) 
-               return interpolate((inflow_generator[: ,1], ), inflow_generator[: ,10], Gridded(Linear()))(abs(t) .% maximum(inflow_generator[: ,1]))
+               return itp(abs(t) % T_max)
           end
      else
           Q_in = 18061.0
@@ -324,6 +280,23 @@ function get_default_parameters_simplified_asm1(; T = 15, get_R::Bool=true, infl
      X_init =  [3.0503 + 63.0433, 0.0093, 3.9350, 6.8924, 0.9580, 1.0]
 
      return (p, X_init)
+
+end
+
+"""
+Return the stoichiometric matrix of the simplified ASM1 model from the parameters given in stoichiometric_parameters.
+"""
+function get_stoichiometric_matrix_simplified_asm1(stoichiometric_parameters)
+
+    Y_A = stoichiometric_parameters[1] ; Y_H = stoichiometric_parameters[2] ; i_XB = stoichiometric_parameters[3]
+    
+    R = @SMatrix[ -1/Y_H         -1/Y_H                 0                       1      0     0;
+              -(1-Y_H)/Y_H   0                      -4.57/Y_A+1         0      0     0;
+              0              -(1-Y_H)/(2.86*Y_H)     1.0/Y_A            0      0     0;
+              -i_XB          -i_XB                  -(i_XB+(1.0/Y_A))   0      1     0;
+              0              0                      0                   0     -1     1]
+
+    return R
 
 end
 
@@ -380,4 +353,143 @@ function get_bounds_parameters_simplified_asm1()
      X_init_upper = [100.0, 100.0, 100.0, 100.0, 100.0, 1.0]
 
      return (p_lower, p_upper, X_init_lower, X_init_upper)
+end
+
+
+
+"""
+Return the default parameters for the simplified ASM1 model.
+"""
+function get_default_parameters_simplified_asm1(; T = 15, influent_file_path = nothing, fixed_concentration = nothing)
+
+     ### Define the function that adapts the parameters according to the temperature ###
+     function T_var(T, ρ, a)
+          return ρ * exp((log2(ρ/a)/5)*(T-15))
+     end  
+
+     ### Additional_parameters ###
+     if fixed_concentration ≠ nothing
+          X_BH = fixed_concentration[1]; X_BA = fixed_concentration[2]; X_ND = fixed_concentration[3]; X_S = fixed_concentration[4]; S_S = fixed_concentration[5]
+     else
+          X_BH = 2238; X_BA = 167; X_ND = 3.10; X_S = 44; S_S = 0.93
+     end
+     θ_1 = T_var(T, 4.0, 3)*mean(X_BH) #μ_H*X_BH
+     θ_2 = (1-0.08)*(T_var(T, 0.3, 0.2)*mean(X_BH) + T_var(T, 0.05, 0.03)*mean(X_BA)) #(1-f_P)*(b_H*X_BH + b_A*X_BA)
+     θ_3 = T_var(T, 0.5, 0.3)*mean(X_BA) #μ_A*X_BA
+     θ_4 = T_var(T, 0.05, 0.04)*mean(X_BH) #k_a*X_BH
+     θ_5 = T_var(T, 3.0, 2.5)*mean(X_BH.*X_ND./X_S)#(X_BH*X_ND*k_h)/X_S
+     additional_parameters = (θ_1=θ_1, θ_2=θ_2, θ_3=θ_3, θ_4=θ_4, θ_5=θ_5)
+
+
+     ### Kinetic parameters ###
+     K_DCO = 10.0*mean((X_S .+ S_S)./S_S) ; K_OH = 0.2 ; K_NO = 0.5; η_g = 0.8 ; η_h = 0.8; K_ND = 0.1*mean(((X_S .+ S_S)./X_S).*X_BH); K_NH = 1.0; K_OA =  0.4
+     kinetic_parameters = (K_DCO=K_DCO, K_OH=K_OH, K_NO=K_NO, η_g=η_g, η_h=η_h, K_ND=K_ND, K_NH=K_NH, K_OA=K_OA)
+
+     ### Stoichiometric parameters ###
+     Y_A = 0.24 ; Y_H = 0.67 ; i_XB = 0.08
+     stoichiometric_parameters = (Y_A=Y_A, Y_H=Y_H, i_XB=i_XB)
+
+     ### Other parameters ###
+     V = 1333.0 # volume
+     SO_sat = (8/10.50237016)*6791.5*(56.12*exp(-66.7354 + 87.4755/((T+273.15)/100.0) + 24.4526*log((T+273.15)/100.0)))
+     KLa = 200*(1.024^(T-15))
+     other_params = (V=V, SO_sat=SO_sat, KLa=KLa)
+
+     ### Influent concentrations and inflow ###
+     X_in =  [3.0503 + 63.0433, 0.0093, 3.9350, 6.8924, 0.9580]
+
+     if influent_file_path ≠ nothing
+          inflow_generator = readdlm(influent_file_path)
+          itp = interpolate((inflow_generator[: ,1], ), inflow_generator[: ,10], Gridded(Linear()))
+          T_max = maximum(inflow_generator[: ,1])
+          function Q_in(t) 
+               return itp(abs(t) % T_max)
+          end
+     else
+          Q_in = 18061.0
+     end
+     exogenous_params = (Q_in=Q_in, X_in=X_in)
+
+     # Merge parameters
+     p = merge(kinetic_parameters, additional_parameters, stoichiometric_parameters, other_params, exogenous_params)
+
+     ### X_init ###
+     X_init =  [3.0503 + 63.0433, 0.0093, 3.9350, 6.8924, 0.9580, 1.0]
+
+     return (p, X_init)
+
+end
+
+
+function simplified_asm1!(dX, X, p, t)
+
+     # If Q_in is a function of the time t, then evaluate it
+     if typeof(p[20]) <: Function
+          Q_in = p[20](t)
+     else
+          Q_in = p[20]
+     end
+
+     Y_A = p[14] ; Y_H = p[15] ; i_XB = p[16]
+     R = @SMatrix[ -1/Y_H          -1/Y_H                 0                  1      0     0;
+                   -(1-Y_H)/Y_H    0                      -4.57/Y_A+1        0      0     0;
+                   0               -(1-Y_H)/(2.86*Y_H)    1.0/Y_A            0      0     0;
+                   -i_XB           -i_XB                  -(i_XB+(1.0/Y_A))  0      1     0;
+                   0               0                      0                  0     -1     1]
+ 
+     ### Calculate process rates ###
+     K_OH = p[2]
+     saturation_oxy_1 = (X[2]/(K_OH+X[2]))
+     saturation_dco = p[9]*(X[1]/(p[1]+X[1]))
+     saturation_no = (X[3]/(p[3]+X[3]))
+     saturation_oxy2_no = saturation_no*K_OH/(K_OH+X[2])
+     process_rates = @SArray [saturation_dco*saturation_oxy_1,
+                              p[4]*saturation_dco*saturation_oxy2_no, 
+                              p[11]*(X[4]/(p[7]+X[4]))*(X[2]/(p[8]+X[2])), 
+                              p[10], 
+                              p[12]*X[5], 
+                              p[13]*((X[1])/(p[6]+X[1]))*(saturation_oxy_1+p[5]*saturation_oxy2_no)]
+     
+     ### Calculate differential equations ###
+     dX[1:5] = (Q_in/p[17]) * (p[21] - X[1:5]) + R * process_rates
+     dX[6] = 0.0
+     dX[2] += X[6] * p[19] * (p[18] - X[2])
+
+end
+
+
+function simplified_asm1_opt!(dX, X, p, t)
+
+     # If Q_in is a function of the time t, then evaluate it
+     if typeof(p[20]) <: Function
+          Q_in = p[20](t)
+     else
+          Q_in = p[20]
+     end
+
+     Y_A = p[14] ; Y_H = p[15] ; i_XB = p[16]
+     R = @SMatrix[ -1/Y_H          -1/Y_H                 0                  1      0     0;
+                   -(1-Y_H)/Y_H    0                      -4.57/Y_A+1        0      0     0;
+                   0               -(1-Y_H)/(2.86*Y_H)    1.0/Y_A            0      0     0;
+                   -i_XB           -i_XB                  -(i_XB+(1.0/Y_A))  0      1     0;
+                   0               0                      0                  0     -1     1]
+ 
+     ### Calculate process rates ###
+     K_OH = p[2]
+     saturation_oxy_1 = (X[2]/(K_OH+X[2]))
+     saturation_dco = p[9]*(X[1]/(p[1]+X[1]))
+     saturation_no = (X[3]/(p[3]+X[3]))
+     saturation_oxy2_no = saturation_no*K_OH/(K_OH+X[2])
+     process_rates = @SArray [saturation_dco*saturation_oxy_1,
+                              p[4]*saturation_dco*saturation_oxy2_no, 
+                              p[11]*(X[4]/(p[7]+X[4]))*(X[2]/(p[8]+X[2])), 
+                              p[10], 
+                              p[12]*X[5], 
+                              p[13]*((X[1])/(p[6]+X[1]))*(saturation_oxy_1+p[5]*saturation_oxy2_no)]
+     
+     ### Calculate differential equations ###
+     dX[1:5] = (Q_in/p[17]) * (p[21:25] - X[1:5]) + R * process_rates
+     dX[6] = 0.0
+     dX[2] += X[6] * p[19] * (p[18] - X[2])
+
 end
