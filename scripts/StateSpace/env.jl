@@ -8,7 +8,7 @@ mutable struct ODECore
     fixed_dt::Float64
     ode_fct!::Function
     state::Vector{Float64}
-    params_vec::Vector{Any}
+    params_vec::NamedTuple
     index_u::Vector{Int64}
 
     # Constructor with all the arguments
@@ -22,7 +22,7 @@ mutable struct ODECore
     function ODECore()
 
         # Initialize simulator
-        simulator = new(0.0, 1/1440, ASM1Simulator.Models.asm1!, [], [], [14])
+        simulator = new(0.0, 1/1440, ASM1Simulator.Models.asm1!, [], NamedTuple(), [14])
 
         # Reset simulator
         reset!(simulator)

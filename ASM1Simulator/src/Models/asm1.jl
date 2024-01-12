@@ -235,10 +235,22 @@ function get_default_parameters_asm1(; T = 15, influent_file_path = nothing)
 
      if false#influent_file_path ≠ nothing
           inflow_generator = readdlm(influent_file_path)
-          list_order = [7, 2, 5, 4, 3, 0.0, 0.0, 0.0, 0.0, 6, 8, 9, 7.0]
-          constant_value = [0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1]
+          # list_order = [7, 2, 5, 4, 3, 0.0, 0.0, 0.0, 0.0, 6, 8, 9, 7.0]
+          # constant_value = [0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1]
+          # list_order = [28.0643, 2, 1532.3, 4, 2245.1, 166.6699, 964.8992, 0.0093, 3.9350, 6, 8, 9, 5.4213]
+          # constant_value = [1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1]
+          list_order = [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699, 964.8992, 0.0093, 3.9350, 6, 0.9580, 3.8453, 5.4213]
+          constant_value = [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1]
+          list_itp = [(constant_value[i] ==  0) ? interpolate((inflow_generator[: ,1], ), inflow_generator[: ,Int(list_order[i])], Gridded(Linear())) :  interpolate((inflow_generator[: ,1], ), list_order[i] .* ones(size(inflow_generator, 1)), Gridded(Linear())) for i in 1:13]
+          T_max = maximum(inflow_generator[: ,1])
           function X_in(t) 
-               return [[(constant_value[i] ==  0) ? interpolate((inflow_generator[: ,1], ), inflow_generator[: ,Int(list_order[i])], Gridded(Linear())) :  interpolate((inflow_generator[: ,1], ), list_order[i] .* ones(size(inflow_generator, 1)), Gridded(Linear())) for i in 1:13][i](abs(t) .% maximum(inflow_generator[: ,1])) for i in 1:13]
+               rtn_list = [list_itp[i](abs(t) .% T_max) for i in 1:13]
+               # rtn_list[2] /= 5
+               # rtn_list[4] /= 5
+               # rtn_list[11] /= 5
+               # rtn_list[12] /= 5
+               rtn_list[10] /= 5
+               return rtn_list
           end
      else 
           # Xin_Si = 28.0643; Xin_Ss = 3.0503; Xin_Xi = 1532.3; Xin_Xs = 63.0433; Xin_Xbh = 2245.1; Xin_Xba = 166.6699; Xin_Xp = 964.8992; Xin_So = 0.0093; Xin_Sno = 3.9350; Xin_Snh = 6.8924; Xin_Snd = 0.9580; Xin_Xnd = 3.8453; Xin_Salk = 5.4213
@@ -275,8 +287,10 @@ function asm1!(dX, X, p, t)
      # If Q_in is a function of the time t, then evaluate it
      if typeof(p[23]) <: Function
           Q_in = p[23](t)
+          X_in = p[24]#(t)
      else
           Q_in = p[23]
+          X_in = p[24]
      end
 
      Y_A = p[15] ; Y_H = p[16] ; f_P = p[17] ; i_XB = p[18] ; i_XP = p[19]
@@ -312,7 +326,7 @@ function asm1!(dX, X, p, t)
 
      ### Calculate differential equations ###
      # General expression
-     dX[1:13] = (Q_in/p[20]) * (p[24] - X[1:13]) + R * process_rates
+     dX[1:13] = (Q_in/p[20]) * (X_in - X[1:13]) + R * process_rates
      dX[14] = 0.0
 
      # Control input for oxygen
