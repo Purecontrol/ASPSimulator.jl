@@ -29,7 +29,7 @@ function set_ode_core(system::Symbol=ASPSimulator.default_sytem; kwargs...)
     if system == :asm1
 
         if !haskey(kwargs, :influent_file_path)
-            kwargs = (; kwargs..., influent_file_path="/home/victor/Documents/code/ASPSimulator.jl/data/external/influent_files/dryinfluent.ascii")
+            kwargs = (; kwargs..., influent_file_path=dirname(dirname(pathof(ASPSimulator))) * "/data/external/influent_files/dryinfluent.ascii")
         end
         p, init_x  = get_default_parameters_asm1(; kwargs...)
 
@@ -38,7 +38,7 @@ function set_ode_core(system::Symbol=ASPSimulator.default_sytem; kwargs...)
     elseif system == :asm1_simplified
 
         if !haskey(kwargs, :influent_file_path)
-            kwargs = (; kwargs..., influent_file_path="/home/victor/Documents/code/ASPSimulator.jl/data/external/influent_files/dryinfluent.ascii")
+            kwargs = (; kwargs..., influent_file_path=dirname(dirname(pathof(ASPSimulator))) * "/data/external/influent_files/dryinfluent.ascii")
         end
         p, init_x = get_default_parameters_simplified_asm1(; kwargs...)
 
