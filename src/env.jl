@@ -1,105 +1,114 @@
-using DifferentialEquations, Dates
+using Dates
+using OrdinaryDiffEq
 
 """
-Define a mutable struct named ODECore used to simulate systems.
+$(TYPEDEF)
+
+$(TYPEDFIELDS)
+
+A mutable structure designed to simulate systems using ordinary differential equations (ODEs).
+This struct contains all the necessary information for defining and solving an ODE system.
 """
 mutable struct ODECore
-
-    current_t::Float64
-    fixed_dt::Float64
+    "The current time of the simulation."
+    current_t::Real
+    "The fixed timestep for simulation in days."
+    fixed_dt::Real
+    "The ODE function to simulate."
     ode_fct!::Function
-    state::Vector{Float64}
-    params::NamedTuple
-    index_u::Vector{Int64}
+    "The current state of the system."
+    current_state::AbstractVector
+    "Parameters used in the ODE function."
+    parameters::NamedTuple
+    "Indices of the state vector representing control inputs."
+    index_u::AbstractVector{Int}
 
-    # Constructor with all the arguments
-    function ODECore(current_t, fixed_dt, ode_fct!, state, params, index_u)
-
-        return new(current_t, fixed_dt, ode_fct!, state, params, index_u)
-
+    """
+    Constructor with full arguments.
+    """
+    function ODECore(current_t::Real, fixed_dt::Real, ode_fct!::Function,
+            current_state::AbstractVector, parameters::NamedTuple, index_u::AbstractVector{Int})
+        return new(current_t, fixed_dt, ode_fct!, current_state, parameters, index_u)
     end
 
-    # Default constructor with no arguments
+    """
+    Default constructor for initializing based on a specific system configuration.
+    """
     function ODECore(system::Symbol; kwargs...)
-
         return new(set_ode_core(system; kwargs...)...)
-
     end
-
 end
 
 """
-Function to perform a single time step simulation over an ODECore element.
+    $(TYPEDSIGNATURES)
+
+Performs a single time step simulation over an `ODECore` instance.
 """
-function step!(env::ODECore, action::Union{Vector{Any}, CallbackSet})
+function step!(env::ODECore, action::Union{AbstractVector, CallbackSet}; alg=nothing, kwargs...)
 
-    # Copy init state
-    init_state = deepcopy(env.state)
+    # Copy the initial state to preserve the original
+    init_state = deepcopy(env.current_state)
 
-    if isa(action, Vector{Float64}) || isa(action, Vector{Int64})
-        
-        # Check if the size of action is the same as env.index_u
-        @assert size(action, 1) == size(env.index_u, 1) "The size of the action need to be the same as the index_u of env."
-
-        # Update control index of init state with choosen action
-        init_state[env.index_u] = action
-
+    # Apply control action if the action is a vector
+    if isa(action, AbstractVector)
+        @assert size(action, 1)==size(env.index_u, 1) "Action size must match the size of `index_u` in `env`."
+        init_state[env.index_u] .= action
     end
 
-    # Define ODEProblem
-    ode_problem = ODEProblem(env.ode_fct!, init_state, (env.current_t,env.current_t + env.fixed_dt), env.params)
+    # Define the ODEProblem
+    ode_problem = ODEProblem(
+        env.ode_fct!, init_state, (env.current_t, env.current_t + env.fixed_dt), env.parameters)
 
-    # Compute the new state
-    if isa(action, CallbackSet)
-        sim_results = solve(ode_problem, saveat=[env.current_t + env.fixed_dt], alg_hints=[:stiff], callback=action)
-    else
-        sim_results = solve(ode_problem, saveat=[env.current_t + env.fixed_dt], alg_hints=[:stiff])
-    end
+    # Solve the ODEProblem with or without callbacks
+    sim_results = isa(action, CallbackSet) ?
+                  solve(ode_problem, alg; saveat = [env.current_t + env.fixed_dt],
+        alg_hints = [:stiff], callback = action, kwargs...) :
+                  solve(ode_problem, alg;
+                   saveat = [env.current_t + env.fixed_dt], alg_hints = [:stiff], kwargs...)
 
-    # Update the time
+    # Update the environment's state and time
     env.current_t += env.fixed_dt
+    env.current_state = sim_results.u[1]
 
-    # Update the state
-    env.state = sim_results.u[1]
-
-    return sim_results
-
+    return TSConcentrations([env.current_t], hcat(env.current_state...))
 end
 
 """
-Function to perform a multi time step simulation over an ODECore element.
+    $(TYPEDSIGNATURES)
+
+Performs a multi-step simulation over an `ODECore` instance.
 """
-function multi_step!(env::ODECore, action::Union{Vector{Vector{Float64}}, CallbackSet}, n_steps::Union{Int64, Period})
+function multi_step!(env::ODECore, action::Union{Vector{AbstractVector}, CallbackSet},
+        n_steps::Union{Int, Period}; alg=nothing, kwargs...)
 
-    # Convert period to timestep if it is the case
-    n_steps = isa(n_steps, Period) ? Int(Dates.value(convert(Dates.Second, n_steps))/(env.fixed_dt*(24*60*60))) : n_steps
+    # Convert Period to number of steps if applicable
+    n_steps = isa(n_steps, Period) ?
+              Int(Dates.value(convert(Dates.Second, n_steps)) /
+                  (env.fixed_dt * 24 * 60 * 60)) : n_steps
 
-    if isa(action, Vector{Vector{Float64}}) || isa(action, Vector{Vector{Int64}})
-        
-        # Check if the size of action is the same as env.index_u
-        @assert size(action, 1) == n_steps "The size of first dimension of the action need to be equal to n_steps."
+    # Handle vectorized control actions
+    if isa(action, Vector{AbstractVector})
+        @assert size(action, 1)==n_steps "The number of actions must match the number of steps."
+        @assert all(size(a_t, 1) == size(env.index_u, 1) for a_t in action) "Each action must match the size of `index_u`."
 
-        # Check if all the shape of each action is compatible with the size of index_u for all the timestep
-        @assert all([size(a_t, 1) for a_t in action] .== size(env.index_u, 1)) "The size of all the second dimension of the action need to be equal to the size of env.index_u."
-
-        # Update control index of init state with choosen action
-        action = external_control([env.current_t + (i-1)*env.fixed_dt for i in 1:n_steps], vcat(action...); index_u = env.index_u[1])
-
+        # Combine actions for external control
+        action = external_control(
+            [env.current_t + (i - 1) * env.fixed_dt for i in 1:n_steps],
+            vcat(action...); index_u = env.index_u)
     end
 
-    # Define ODEProblem
-    ode_problem = ODEProblem(env.ode_fct!, env.state, (env.current_t,env.current_t + env.fixed_dt*n_steps), env.params)
+    # Define the ODEProblem for multi-step simulation
+    ode_problem = ODEProblem(env.ode_fct!, env.current_state,
+        (env.current_t, env.current_t + env.fixed_dt * n_steps), env.parameters)
 
-    # Compute the new states
-    sim_results = solve(ode_problem, saveat=[env.current_t + i*env.fixed_dt for i in 1:n_steps], alg_hints=[:stiff], callback=action)
+    # Solve the ODEProblem
+    sim_results = solve(ode_problem, alg;
+        saveat = [env.current_t + i * env.fixed_dt for i in 1:n_steps],
+        alg_hints = [:stiff], callback = action, kwargs...)
 
-    # Update the time
-    env.current_t += env.fixed_dt*n_steps
+    # Update the environment's state and time
+    env.current_t += env.fixed_dt * n_steps
+    env.current_state = sim_results.u[end]
 
-    # Update the state
-    env.state = sim_results.u[end]
-
-    return sim_results
-
+    return TSConcentrations(sim_results.t, stack(sim_results.u, dims = 1))
 end
-
