@@ -82,3 +82,79 @@ function external_control(array_t, array_u; index_u = -1)
 
     return external_control_callback
 end
+
+"""
+    $(TYPEDSIGNATURES)
+
+Returns a CallbackSet that simulates the redox control of a bioreactor with additional real time constraints.
+"""
+function timed_redox_control(;
+        index_no3 = 9,
+        index_nh4 = 10,
+        index_u = -1,
+        t_initial = 0.0,
+        min_aeration_time_minutes = 30.0,
+        min_non_aeration_time_minutes = 30.0,
+        max_aeration_time_minutes = 120.0,
+        max_non_aeration_time_minutes = 120.0,
+        NO_threshold = 0.5,
+        NH_threshold = 0.5
+)
+
+    # Convert times from minutes to days
+    min_aeration_time = min_aeration_time_minutes / (60.0 * 24.0)
+    min_non_aeration_time = min_non_aeration_time_minutes / (60.0 * 24.0)
+    max_aeration_time = max_aeration_time_minutes / (60.0 * 24.0)
+    max_non_aeration_time = max_non_aeration_time_minutes / (60.0 * 24.0)
+
+    # Stores the time of the last aeration state change
+    t_last_aeration_change = Ref(t_initial)
+
+    get_u_idx(uu) = (index_u == -1) ? lastindex(uu) : index_u
+
+    function condition_aeration_on(u, t, integrator)
+        idx = get_u_idx(u)
+        current_aeration_state = u[idx]
+
+        (current_aeration_state == 1) && return false # Already ON
+
+        time_since_last_change = t - t_last_aeration_change[]
+        s_no_low = u[index_no3] < NO_threshold
+
+        return (time_since_last_change >= max_non_aeration_time) ||
+               (s_no_low && (time_since_last_change >= min_non_aeration_time))
+    end
+
+    function affect_aeration_on!(integrator)
+        idx = get_u_idx(integrator.u)
+        integrator.u[idx] = 1
+        t_last_aeration_change[] = integrator.t
+    end
+
+    callback_aeration_on = DiscreteCallback(
+        condition_aeration_on, affect_aeration_on!; save_positions = (false, false))
+
+    function condition_aeration_off(u, t, integrator)
+        idx = get_u_idx(u)
+        current_aeration_state = u[idx]
+
+        (current_aeration_state == 0) && return false # Already OFF
+
+        time_since_last_change = t - t_last_aeration_change[]
+        s_nh_low = u[index_nh4] < NH_threshold
+
+        return (time_since_last_change >= max_aeration_time) ||
+               (s_nh_low && (time_since_last_change >= min_aeration_time))
+    end
+
+    function affect_aeration_off!(integrator)
+        idx = get_u_idx(integrator.u)
+        integrator.u[idx] = 0
+        t_last_aeration_change[] = integrator.t
+    end
+
+    callback_aeration_off = DiscreteCallback(
+        condition_aeration_off, affect_aeration_off!; save_positions = (false, false))
+
+    return CallbackSet(callback_aeration_on, callback_aeration_off)
+end
