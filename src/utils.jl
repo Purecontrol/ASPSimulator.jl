@@ -70,15 +70,20 @@ end
 
 Return the inflow specified in a source file coming from the Benchmark Simulation model.
 """
-function get_inflow_from_bsm_files(influent_file_path)
-
-    # Read file
+function get_inflow_from_bsm_files(influent_file_path; col_index=10, kwargs...)
+    # Read the file
     inflow_generator = readdlm(influent_file_path)
+    
+    # Check that the requested column exists
+    ncols = size(inflow_generator, 2)
+    if col_index > ncols || col_index < 1
+        error("col_index=$col_index is out of bounds for file with $ncols columns")
+    end
 
-    # Set up interpolation function with data provided in the file
-    itp = interpolate((inflow_generator[:, 1],), inflow_generator[:, 10], Gridded(Linear()))
+    # Set up interpolation function with the chosen column
+    itp = interpolate((inflow_generator[:, 1],), inflow_generator[:, col_index], Gridded(Linear()))
 
-    # Define a function giving the inflow
+    # Define the function returning the inflow at time t
     T_max = maximum(inflow_generator[:, 1])
     function Q_in(t)
         return itp(abs(t) % T_max)
@@ -93,26 +98,26 @@ end
 Return the inlet concentrations specified in a source file coming from the Benchmark Simulation model.
 """
 function get_inlet_concentrations_from_src_files(
-        influent_file_path; output_index = collect(1:13))
+        influent_file_path; output_index = collect(1:13),
+        index_files = nothing,
+        divide_by = nothing,
+        kwargs...
+        )
 
     # Read file
     inflow_generator = readdlm(influent_file_path)
 
     # Set up interpolation function with data provided in the file
-    # Real usage of the file but don't work whithout using a clarifier
-    # list_order = [7, 2, 5, 4, 3, 0.0, 0.0, 0.0, 0.0, 6, 8, 9, 7.0]
-    # constant_value = [0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1]
-    # Our modified usage
-    list_order = [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699,
-        964.8992, 0.0093, 3.9350, 6, 0.9580, 3.8453, 5.4213]
-    constant_value = [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1]
-    divide_by = [1, 1, 1, 1, 1, 1, 1, 1, 1, 5, 1, 1, 1]
-    list_itp = [(constant_value[i] == 0) ?
+    default_constant_value = [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699,
+        964.8992, 0.0093, 3.9350, 6.8924, 0.9580, 3.8453, 5.4213]
+    index_files = isnothing(index_files) ? [0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0] : index_files
+    divide_by = isnothing(divide_by) ? [1, 1, 1, 1, 1, 1, 1, 1, 1, 5, 1, 1, 1] : divide_by
+    list_itp = [(index_files[i] != 0) ?
                 interpolate((inflow_generator[:, 1],),
-                    inflow_generator[:, Int(list_order[i])] / divide_by[i],
+                    inflow_generator[:, Int(index_files[i])] / divide_by[i],
                     Gridded(Linear())) :
                 interpolate((inflow_generator[:, 1],),
-                    list_order[i] .* ones(size(inflow_generator, 1)) / divide_by[i],
+                    default_constant_value[i] .* ones(size(inflow_generator, 1)) / divide_by[i],
                     Gridded(Linear())) for i in 1:13]
 
     # Define a function giving the inlet concentration

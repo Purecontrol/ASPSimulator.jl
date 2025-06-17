@@ -6,7 +6,7 @@ using DelimitedFiles: readdlm
 Return the default parameters and an initial condition for the ASM1 model.
 """
 function get_default_parameters_asm1(; T = 15, influent_file_path = nothing,
-        variable_inlet_concentration = true, variable_inflow = true)
+        variable_inlet_concentration = true, variable_inflow = true, kwargs...)
 
     # Set kinetics parameters
     μ_H = T_var(T, 4.0, 3)
@@ -45,14 +45,14 @@ function get_default_parameters_asm1(; T = 15, influent_file_path = nothing,
 
     #Set inlet concentrations and inflow
     if influent_file_path ≠ nothing && variable_inlet_concentration
-        X_in = get_inlet_concentrations_from_src_files(influent_file_path)
+        X_in = get_inlet_concentrations_from_src_files(influent_file_path; kwargs...)
     else
         X_in = [28.0643, 3.0503, 1532.3, 63.0433, 2245.1, 166.6699,
             964.8992, 0.0093, 3.9350, 6.8924, 0.9580, 3.8453, 5.4213]
     end
 
     if influent_file_path ≠ nothing && variable_inflow
-        Q_in = get_inflow_from_bsm_files(influent_file_path)
+        Q_in = get_inflow_from_bsm_files(influent_file_path; kwargs...)
     else
         Q_in = 18061.0
     end
