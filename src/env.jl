@@ -78,7 +78,7 @@ end
 
 Performs a multi-step simulation over an `ODECore` instance.
 """
-function multi_step!(env::ODECore, action::Union{Vector{AbstractVector}, CallbackSet},
+function multi_step!(env::ODECore, action::Union{Vector{<:AbstractVector}, CallbackSet},
         n_steps::Union{Int, Period}; alg=nothing, kwargs...)
 
     # Convert Period to number of steps if applicable
@@ -87,7 +87,7 @@ function multi_step!(env::ODECore, action::Union{Vector{AbstractVector}, Callbac
                   (env.fixed_dt * 24 * 60 * 60)) : n_steps
 
     # Handle vectorized control actions
-    if isa(action, Vector{AbstractVector})
+    if isa(action, Vector{<:AbstractVector})
         @assert size(action, 1)==n_steps "The number of actions must match the number of steps."
         @assert all(size(a_t, 1) == size(env.index_u, 1) for a_t in action) "Each action must match the size of `index_u`."
 

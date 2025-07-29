@@ -63,7 +63,7 @@ Returns a ContinuousCallback that simulates the external control of a bioreactor
 function external_control(array_t, array_u; index_u = -1)
 
     # Create a function that returns the control value at a given time
-    control = Interpolations.interpolate(
+    control = interpolate(
         (array_t,), vcat(array_u[2:end], array_u[end]), Gridded(Linear()))
 
     # Search for the change in the control value in the array_u
@@ -158,3 +158,6 @@ function timed_redox_control(;
 
     return CallbackSet(callback_aeration_on, callback_aeration_off)
 end
+@inline timed_redox_control(s::Symbol) = timed_redox_control(
+    index_no3 = get_no3_index(s), index_nh4 = get_nh4_index(s),
+    index_u = get_control_index(s))
