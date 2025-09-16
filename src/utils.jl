@@ -70,7 +70,7 @@ end
 
 Return the inflow specified in a source file coming from the Benchmark Simulation model.
 """
-function get_inflow_from_bsm_files(influent_file_path; col_index=10, kwargs...)
+function get_inflow_from_bsm_files(influent_file_path; col_index=10, inflow_ponderation = 1.0, kwargs...)
     # Read the file
     inflow_generator = readdlm(influent_file_path)
     
@@ -81,7 +81,7 @@ function get_inflow_from_bsm_files(influent_file_path; col_index=10, kwargs...)
     end
 
     # Set up interpolation function with the chosen column
-    itp = interpolate((inflow_generator[:, 1],), inflow_generator[:, col_index], Gridded(Linear()))
+    itp = interpolate((inflow_generator[:, 1],), inflow_generator[:, col_index].*inflow_ponderation, Gridded(Linear()))
 
     # Define the function returning the inflow at time t
     T_max = maximum(inflow_generator[:, 1])
